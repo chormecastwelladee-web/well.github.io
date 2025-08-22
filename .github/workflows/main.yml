@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
-        <body> { font-family: 'Sarabun', sans-serif; }
+        body { font-family: 'Sarabun', sans-serif; }
         .task-completed { background: linear-gradient(135deg, #10b981, #059669); }
         .task-pending { background: linear-gradient(135deg, #f59e0b, #d97706); }
         .fade-in { animation: fadeIn 0.3s ease-in; }
