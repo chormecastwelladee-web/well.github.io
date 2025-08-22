@@ -412,25 +412,45 @@
         }
 
         function handleImageUpload(taskId, files) {
-            const task = tasks.find(t => t.id === taskId);
-            if (task && files.length > 0) {
-                Array.from(files).forEach(file => {
-                    if (file.type.startsWith('image/') && task.images.length < 10) {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            task.images.push({
-                                name: file.name,
-                                data: e.target.result,
-                                uploadedAt: new Date().toISOString()
-                            });
-                            saveToStorage();
-                            renderTasks();
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                });
-            }
-        }
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || files.length === 0) return;
+
+    Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const base64Data = e.target.result.split(',')[1]; // ตัด Data URL
+            const formData = new FormData();
+            formData.append('fileBase64', base64Data);
+            formData.append('fileName', file.name);
+            formData.append('mimeType', file.type);
+
+            fetch('https://script.google.com/macros/s/AKfycbyUlQ3Zri9VYvaHBWlamnvWoAGNjjTLeBWjci_YrXV54ouPO_Qf43lvotx8kumBzhkaHQ/exec', { // URL ของ Google Apps Script Web App
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    task.images.push({
+                        name: file.name,
+                        url: data.url,
+                        uploadedAt: new Date().toISOString()
+                    });
+                    saveToStorage(); // เก็บ URL ไว้ใน localStorage
+                    renderTasks();
+                } else {
+                    alert('อัปโหลดไม่สำเร็จ: ' + data.message);
+                }
+            })
+            .catch(err => {
+                alert('เกิดข้อผิดพลาด: ' + err.message);
+            });
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
         function viewImages(taskId) {
             const task = tasks.find(t => t.id === taskId);
@@ -442,7 +462,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         ${task.images.map((img, index) => `
                             <div class="border rounded-lg overflow-hidden">
-                                <img src="${img.data}" alt="${img.name}" class="w-full h-48 object-cover image-preview">
+                                <img src="${img.url}" alt="${img.name}" class="w-full h-48 object-cover image-preview">
                                 <div class="p-2 bg-gray-50">
                                     <div class="text-xs text-gray-600">${img.name}</div>
                                     <div class="text-xs text-gray-500">${new Date(img.uploadedAt).toLocaleString('th-TH')}</div>
