@@ -251,7 +251,7 @@
                                         <th class="text-center py-2">การดำเนินการ</th>
                                     </tr>
                                 </thead>
-                                <body>
+                                body
                                     ${roomTasks.map(task => `
                                         <tr class="border-b hover:bg-gray-50">
                                             <td class="py-3 font-medium">${task.taskType}</td>
