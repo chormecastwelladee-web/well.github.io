@@ -234,14 +234,17 @@ function renderTasks() {
                                         class="w-full px-2 py-1 border rounded text-xs ${task.status === 'completed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-blue-500'}">
                                 </td>
                                 <td class="py-3">
-                                    <div class="flex items-center space-x-2">
-                                        <input type="file" id="images-${task.id}" multiple accept="image/*"
-                                            onchange="Array.from(this.files).forEach(f=>uploadFile(f,tasks.find(t=>t.id==='${task.id}')))" class="hidden">
-                                        <button onclick="document.getElementById('images-${task.id}').click()" 
-                                                class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600">📷 เพิ่มรูป</button>
-                                        ${task.images.length>0?`<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">👁️ ดูรูป (${task.images.length})</button>`:''}
-                                    </div>
-                                </td>
+    <div class="flex items-center space-x-2">
+        <label class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 cursor-pointer">
+            📷 เพิ่มรูป
+            <input type="file" id="images-${task.id}" multiple accept="image/*"
+                onchange="Array.from(this.files).forEach(f=>uploadFile(f,tasks.find(t=>t.id==='${task.id}')))" 
+                class="sr-only">
+        </label>
+        ${task.images.length>0?`<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">👁️ ดูรูป (${task.images.length})</button>`:''}
+    </div>
+</td>
+
                                 <td class="py-3">
                                     <span class="px-2 py-1 rounded-full text-xs font-medium ${task.status === 'completed'?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">
                                         ${task.status === 'completed'?'✅ เสร็จเรียบร้อย':'⏳ ยังไม่เสร็จ'}
