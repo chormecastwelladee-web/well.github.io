@@ -261,10 +261,10 @@ function renderTasks() {
                                 </td>
                                 <td class="py-3 text-center">
                                     <div class="flex flex-col space-y-2">
-                                        <button onclick="toggleTaskStatus('${task.id}')" class="px-3 py-1 rounded-lg text-xs font-medium transition-colors ${task.status === 'completed' ? 'bg-red-200 text-gray-700 hover:bg-gray-300' : 'bg-green-500 text-white hover:bg-green-600'}">
+                                        <button onclick="toggleTaskStatus('${task.id}')" class="px-3 py-1 rounded-lg text-xs font-medium transition-colors ${task.status === 'completed' ? 'bg-green-400 text-gray-700 hover:bg-gray-300' : 'bg-green-500 text-white hover:bg-green-600'}">
                                             ${task.status === 'completed'?'↩️ ยกเลิกงาน':'✅ เสร็จงาน'}
                                         </button>
-                                        <button onclick="toggleReviewStatus('${task.id}')" class="px-3 py-1 rounded-lg text-xs font-medium transition-colors ${task.reviewStatus === 'reviewed' ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-purple-500 text-white hover:bg-purple-600'}">
+                                        <button onclick="toggleReviewStatus('${task.id}')" class="px-3 py-1 rounded-lg text-xs font-medium transition-colors ${task.reviewStatus === 'reviewed' ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-red-500 text-white hover:bg-red-600'}">
                                             ${task.reviewStatus === 'reviewed'?'↩️ ยกเลิกการตรวจสอบ':'✅ ตรวจสอบแล้ว'}
                                         </button>
                                     </div>
