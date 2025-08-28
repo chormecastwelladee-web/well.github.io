@@ -16,6 +16,7 @@ body { font-family: 'Sarabun', sans-serif; }
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
 
+<!-- Header -->
 <div class="bg-white shadow-lg border-b-4 border-blue-500">
     <div class="container mx-auto px-4 py-6">
         <h1 class="text-3xl font-bold text-gray-800 text-center">🏠 ระบบติดตามงานแม่บ้าน</h1>
@@ -30,6 +31,7 @@ body { font-family: 'Sarabun', sans-serif; }
     </div>
 </div>
 
+<!-- Progress -->
 <div class="container mx-auto px-4 py-4">
     <div class="bg-white rounded-lg shadow-md p-4">
         <div class="flex justify-between items-center mb-2">
@@ -42,6 +44,7 @@ body { font-family: 'Sarabun', sans-serif; }
     </div>
 </div>
 
+<!-- Tasks -->
 <div id="tasksContent" class="container mx-auto px-4 pb-8">
     <div class="bg-white rounded-lg shadow-md p-4 mb-6">
         <h3 class="text-lg font-semibold mb-4 text-gray-800">🔍 ตัวกรอง</h3>
@@ -70,6 +73,7 @@ body { font-family: 'Sarabun', sans-serif; }
     <div id="tasksGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"></div>
 </div>
 
+<!-- Summary -->
 <div id="summaryContent" class="container mx-auto px-4 pb-8 hidden">
     <div class="bg-white rounded-lg shadow-md p-6">
         <h3 class="text-2xl font-bold mb-6 text-gray-800">📊 สรุปงานทั้งหมด</h3>
@@ -78,6 +82,7 @@ body { font-family: 'Sarabun', sans-serif; }
     </div>
 </div>
 
+<!-- Image Modal -->
 <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg max-w-full max-h-full overflow-auto">
         <div class="p-4 border-b flex justify-between items-center">
@@ -89,14 +94,13 @@ body { font-family: 'Sarabun', sans-serif; }
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
-
+<!-- Firebase App (only v12 module) -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
   import { getDatabase, ref, set, update, get, onValue } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 
+  // ✅ Firebase config ของคุณ
   const firebaseConfig = {
     apiKey: "AIzaSyDxHYua4i21OV_N5Me_5ORsQrQ1unXQuBA",
     authDomain: "report-jobhk.firebaseapp.com",
@@ -111,7 +115,7 @@ body { font-family: 'Sarabun', sans-serif; }
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
   const database = getDatabase(app);
-  const tasksRef = ref(database, "housekeepingTasks");
+  const tasksRef = ref(database, "report-jobhk");
 
 
 const floors = {
