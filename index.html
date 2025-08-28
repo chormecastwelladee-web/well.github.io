@@ -96,9 +96,12 @@ body { font-family: 'Sarabun', sans-serif; }
   // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
 
-// ** ⚠️ เปลี่ยนโค้ดส่วนนี้ด้วย Firebase config ของคุณ ⚠️ **
-const firebaseConfig = {
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
     apiKey: "AIzaSyDxHYua4i21OV_N5Me_5ORsQrQ1unXQuBA",
     authDomain: "report-jobhk.firebaseapp.com",
     databaseURL: "https://report-jobhk-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -112,6 +115,7 @@ const firebaseConfig = {
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
+</script>
 
 const floors = {
     3: Array.from({length: 10}, (_, i) => 301 + i),
@@ -302,6 +306,22 @@ function renderTasks() {
     updateProgress();
 }
 
+// main.js (type="module")
+function updateAssignee(taskId, newAssignee) {
+  console.log("Update assignee:", taskId, newAssignee);
+  // TODO: Firebase update
+}
+
+function toggleTaskStatus(taskId) {
+  console.log("Toggle status:", taskId);
+  // TODO: Firebase update
+}
+
+// make them accessible in HTML
+window.updateAssignee = updateAssignee;
+window.toggleTaskStatus = toggleTaskStatus;
+
+    
 function renderSummary() {
     const statsContainer = document.getElementById('summaryStats');
     const tableContainer = document.getElementById('summaryTable');
