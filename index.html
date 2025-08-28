@@ -334,55 +334,6 @@ function toggleTaskStatus(taskId) {
   update(ref(database, `housekeepingTasks/${taskId}`), updates);
 }
 
-unction resetAllTasks(){
-    if(!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return;
-    const tasksObject = {};
-    Object.keys(floors).forEach(floor=>{
-        floors[floor].forEach(room=>{
-            taskTypes.forEach(taskType=>{
-                const taskId = `${floor}-${room}-${taskType}`;
-                tasksObject[taskId]={id:taskId,floor:floor,room:room,taskType:taskType,status:'pending',reviewStatus:'pending_review',assignee:'',reviewedBy:'',images:[],completedAt:null,completedBy:'',reviewedAt:null};
-            });
-        });
-    });
-    set(tasksRef,tasksObject);
-}
-
-function renderSummary(){
-    const stats = document.getElementById('summaryStats');
-    const table = document.getElementById('summaryTable');
-    const total = tasks.length;
-    const completed = tasks.filter(t=>t.status==='completed').length;
-    const pending = total-completed;
-    const reviewed = tasks.filter(t=>t.reviewStatus==='reviewed').length;
-    const pendingReview = completed-reviewed;
-
-    stats.innerHTML=`<div class="bg-blue-500 text-white p-4 rounded-lg">ทั้งหมด ${total}</div>
-    <div class="bg-green-500 text-white p-4 rounded-lg">เสร็จแล้ว ${completed}</div>
-    <div class="bg-yellow-500 text-white p-4 rounded-lg">ยังไม่เสร็จ ${pending}</div>
-    <div class="bg-purple-500 text-white p-4 rounded-lg">ตรวจสอบแล้ว ${reviewed}</div>
-    <div class="bg-pink-500 text-white p-4 rounded-lg">รอการตรวจสอบ ${pendingReview}</div>`;
-
-    const grouped = {};
-    tasks.forEach(t=>{
-        const key=`${t.floor}-${t.room}`;
-        if(!grouped[key]) grouped[key]=[];
-        grouped[key].push(t);
-    });
-
-    table.innerHTML=`<table class="w-full text-sm"><thead><tr><th>ห้อง</th><th>ชั้น</th><th>เสร็จ/ทั้งหมด</th><th>ความคืบหน้า</th><th>ตรวจสอบแล้ว</th><th>งานเหลือ</th></tr></thead><tbody>${
-        Object.keys(grouped).map(k=>{
-            const [floor,room]=k.split('-');
-            const tasksR = grouped[k];
-            const done = tasksR.filter(t=>t.status==='completed').length;
-            const review = tasksR.filter(t=>t.reviewStatus==='reviewed').length;
-            const percent = (done/tasksR.length)*100;
-            const pendingTasks = tasksR.filter(t=>t.status==='pending');
-            return `<tr class="border-b hover:bg-gray-50"><td>${room}</td><td>${floor}</td><td>${done}/${tasksR.length}</td><td><div class="flex items-center"><div class="bg-gray-200 rounded-full h-2 flex-1"><div class="bg-blue-500 h-2 rounded-full" style="width:${percent}%"></div></div><span class="text-xs ml-2">${Math.round(percent)}%</span></div></td><td>${review}/${done}</td><td>${pendingTasks.map(t=>t.taskType).join(', ')}</td></tr>`;
-        }).join('')
-    }</tbody></table>`;
-}
-    
 function updateAssignee(id, value) {
   const task = tasks.find(t => t.id === id);
   if (!task || task.status === 'completed') {
@@ -479,17 +430,16 @@ function showTab(tab){
 // ========================
 // Initialize
 // ========================
-window.showTab=showTab;
-window.updateAssignee=updateAssignee;
-window.toggleTaskStatus=toggleTaskStatus;
-window.toggleReviewStatus=toggleReviewStatus;
-window.uploadFile=uploadFile;
-window.viewImages=viewImages;
-window.closeImageModal=closeImageModal;
-window.resetAllTasks=resetAllTasks;
+window.updateAssignee = updateAssignee;
+window.toggleTaskStatus = toggleTaskStatus;
+window.toggleReviewStatus = toggleReviewStatus;
+window.updateReviewer = updateReviewer;
+window.viewImages = viewImages;
+window.closeImageModal = closeImageModal;
 
 initializeAndLoad();
 </script>
+
 
 
 
