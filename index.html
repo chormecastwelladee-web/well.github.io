@@ -93,14 +93,10 @@ body { font-family: 'Sarabun', sans-serif; }
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
 
 <script type="module">
-  // Import the functions you need from the SDKs you need
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+  import { getDatabase, ref, set, update, get, onValue } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
   const firebaseConfig = {
     apiKey: "AIzaSyDxHYua4i21OV_N5Me_5ORsQrQ1unXQuBA",
     authDomain: "report-jobhk.firebaseapp.com",
@@ -112,9 +108,10 @@ body { font-family: 'Sarabun', sans-serif; }
     measurementId: "G-53EZWY79NL"
   };
 
-  // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
+  const database = getDatabase(app);
+  const tasksRef = ref(database, "housekeepingTasks");
 </script>
 
 const floors = {
