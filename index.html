@@ -113,8 +113,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
-const database = getDatabase(app);
-const tasksRef = ref(database, "housekeepingTasks");
 
 // Floor & Room setup
 const floors = {
@@ -133,27 +131,33 @@ let currentTab = 'tasks';
 // ========================
 // โค้ดที่ได้รับการแก้ไข
 async function initializeAndLoad() {
-  const lastResetDateRef = ref(database, 'lastResetDate');
-  const snapshot = await get(lastResetDateRef);
-  const lastResetDate = snapshot.val();
-  const today = new Date().toDateString();
+    const tasksSnapshot = await get(tasksRef);
+    const tasksData = tasksSnapshot.val();
 
-  // ตรวจสอบว่าถึงวันแรกของเดือนหรือไม่ และยังไม่ได้รีเซ็ต
-  if (!lastResetDate || (new Date().getDate() === 1 && today !== lastResetDate)) {
-    if (confirm('วันนี้เป็นวันแรกของเดือนใหม่ คุณต้องการรีเซ็ตงานทั้งหมดเพื่อเริ่มต้นเดือนนี้หรือไม่?')) {
-      await resetAllTasks();
-      await set(lastResetDateRef, today);
+    if (!tasksData) {
+        createInitialTasks();
     }
-  }
+    
+    // โหลดและแสดงผลก่อน แล้วค่อยตรวจสอบการรีเซ็ต
+    onValue(tasksRef, (snapshot) => {
+        const data = snapshot.val();
+        tasks = data ? Object.values(data) : [];
+        renderPage();
+    });
 
-  // Real-time listener: ทำงานหลังจากตรวจสอบการรีเซ็ต
-  onValue(tasksRef, (snapshot) => {
-    const data = snapshot.val();
-    tasks = data ? Object.values(data) : [];
-    renderPage();
-  });
+    const lastResetDateRef = ref(database, 'lastResetDate');
+    const resetSnapshot = await get(lastResetDateRef);
+    const lastResetDate = resetSnapshot.val();
+    const today = new Date().toDateString();
+
+    // ตรวจสอบว่าถึงวันแรกของเดือนหรือไม่ และยังไม่ได้รีเซ็ต
+    if (!lastResetDate || (new Date().getDate() === 1 && today !== lastResetDate)) {
+        if (confirm('วันนี้เป็นวันแรกของเดือนใหม่ คุณต้องการรีเซ็ตงานทั้งหมดเพื่อเริ่มต้นเดือนนี้หรือไม่?')) {
+            await resetAllTasks();
+            await set(lastResetDateRef, today);
+        }
+    }
 }
-
 // ========================
 // Create initial tasks
 // ========================
