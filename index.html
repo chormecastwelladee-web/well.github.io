@@ -131,17 +131,22 @@ let currentTab = 'tasks';
 // ========================
 // Initialize & Load Tasks
 // ========================
+// โค้ดที่ได้รับการแก้ไข
 async function initializeAndLoad() {
-  const snapshot = await get(tasksRef);
-  const data = snapshot.val();
-  if (!data) {
-    createInitialTasks();
-  } else {
-    tasks = Object.values(data);
-    renderPage();
+  const lastResetDateRef = ref(database, 'lastResetDate');
+  const snapshot = await get(lastResetDateRef);
+  const lastResetDate = snapshot.val();
+  const today = new Date().toDateString();
+
+  // ตรวจสอบว่าถึงวันแรกของเดือนหรือไม่ และยังไม่ได้รีเซ็ต
+  if (!lastResetDate || (new Date().getDate() === 1 && today !== lastResetDate)) {
+    if (confirm('วันนี้เป็นวันแรกของเดือนใหม่ คุณต้องการรีเซ็ตงานทั้งหมดเพื่อเริ่มต้นเดือนนี้หรือไม่?')) {
+      await resetAllTasks();
+      await set(lastResetDateRef, today);
+    }
   }
 
-  // Real-time listener
+  // Real-time listener: ทำงานหลังจากตรวจสอบการรีเซ็ต
   onValue(tasksRef, (snapshot) => {
     const data = snapshot.val();
     tasks = data ? Object.values(data) : [];
