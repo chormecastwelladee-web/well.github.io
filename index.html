@@ -374,6 +374,20 @@ function toggleTaskStatus(taskId) {
   update(ref(database, `housekeepingTasks/${taskId}`), updates);
 }
 
+function uploadFile(file, task){
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const updatedImages = task.images ? [...task.images, e.target.result] : [e.target.result];
+    update(ref(database, `housekeepingTasks/${task.id}`), { images: updatedImages })
+      .then(() => {
+        task.images = updatedImages; // อัปเดตในตัวแปร local ทันที
+        renderTasks();               // รีเรนเดอร์เพื่อให้ปุ่ม "ดูรูป" ปรากฏทันที
+      });
+  }
+  reader.readAsDataURL(file);
+}
+
+    
 // ฟังก์ชันสรุปข้อมูล
 function renderSummary() {
     const statsContainer = document.getElementById('summaryStats');
