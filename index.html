@@ -146,50 +146,41 @@ function initializeTasks() {
             });
         });
     });
-    loadFromStorage();
+    saveToFirebase();
 }
 
-function saveToStorage() {
-    localStorage.setItem('housekeepingTasks', JSON.stringify(tasks));
-    localStorage.setItem('lastResetDate', new Date().toDateString());
+f// 🔹 บันทึก tasks ทั้งหมดลง Firebase
+async function saveToFirebase(){
+  const updates = {};
+  tasks.forEach(task => {
+    updates[`tasks/${task.id}`] = task;
+  });
+  await update(ref(db), updates);
 }
 
-function loadFromStorage() {
-    const saved = localStorage.getItem('housekeepingTasks');
-    const lastReset = localStorage.getItem('lastResetDate');
-    const today = new Date();
-    const lastResetDate = lastReset ? new Date(lastReset) : null;
-
-    if (!lastResetDate || (today.getDate() === 1 && today.toDateString() !== lastReset)) {
-        tasks.forEach(task => {
-            task.status = 'pending';
-            task.completedAt = null;
-            task.completedBy = '';
-            task.assignee = '';
-            task.images = [];
-            task.reviewStatus = 'pending_review';
-            task.reviewedBy = '';
-            task.reviewedAt = null;
-        });
-        saveToStorage();
-        return;
+// 🔹 โหลด tasks จาก Firebase แบบ realtime
+function loadFromFirebase(){
+  onValue(ref(db, "tasks"), snapshot => {
+    const data = snapshot.val();
+    if (data){
+      tasks = Object.values(data);
     }
-
-    if (saved) {
-        const savedTasks = JSON.parse(saved);
-        tasks.forEach(task => {
-            const savedTask = savedTasks.find(t => t.id === task.id);
-            if (savedTask) {
-                Object.assign(task, savedTask);
-                if (savedTask.reviewStatus === undefined) {
-                    task.reviewStatus = 'pending_review';
-                    task.reviewedBy = '';
-                    task.reviewedAt = null;
-                }
-            }
-        });
-    }
+    renderTasks();
+    if (currentTab === 'summary') renderSummary();
+  });
 }
+
+
+async function uploadFile(file, task){
+  const filePath = `tasks/${task.id}/${Date.now()}-${file.name}`;
+  const storageRef = sRef(storage, filePath);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  task.images.push(url);
+  await saveToFirebase();
+  renderTasks();
+}
+
 
 function renderTasks() {
     const grid = document.getElementById('tasksGrid');
