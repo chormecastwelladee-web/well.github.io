@@ -174,26 +174,10 @@ function initializeTasks() {
   saveToDatabaseOnce();
 }
 
-function saveToDatabaseOnce() {
-  const tasksRef = ref(db, "tasks");
-  set(tasksRef, tasks)
-    .then(() => console.log("Tasks initialized."))
-    .catch(err => console.error(err));
-}
-
-
-
 
 let initialized = false;
 
-function initializeTasksOnce() {
-  if (initialized) return;
-  initialized = true;
 
-  tasks = createDefaultTasks(); // สร้าง array default
-  set(ref(db, "tasks"), tasks) // เขียนค่าเริ่มต้นครั้งเดียว
-    .then(() => console.log("Tasks initialized"));
-}
 
 
 
@@ -269,7 +253,12 @@ function renderTasks() {
                 onchange="Array.from(this.files).forEach(f=>uploadFile(f,tasks.find(t=>t.id==='${task.id}')))" 
                 class="sr-only">
         </label>
-        ${task.images.length>0?`<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">👁️ ดูรูป (${task.images.length})</button>`:''}
+        ${(task.images || []).length > 0 
+    ? `<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">
+        👁️ ดูรูป (${(task.images || []).length})
+      </button>` 
+    : ''}
+
     </div>
 </td>
 
@@ -473,17 +462,25 @@ function toggleReviewStatus(taskId) {
 }
 
 // Update reviewer
-function updateReviewer(id, value) {
+// View images (ปรับ version เดียว)
+function viewImages(id){
     const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    if (task.reviewStatus === 'reviewed') {
-        alert('ไม่สามารถแก้ไขชื่อผู้ตรวจสอบได้ เนื่องจากงานนี้ตรวจสอบแล้ว');
-        renderTasks(); 
-        return;
+    if (!task || !(task.images && task.images.length)) return; // ป้องกัน error
+    const container = document.getElementById('imageModalContent');
+    container.innerHTML = (task.images || []).map(img => `<img src="${img}" class="w-full mb-2 image-preview">`).join('');
+    document.getElementById('imageModal').classList.remove('hidden');
+}
+
+// Image upload
+function uploadFile(file, task){
+    if (!task.images) task.images = []; // ป้องกัน undefined
+    const reader = new FileReader();
+    reader.onload = function(e){
+        task.images.push(e.target.result);
+        saveToDatabase();
+        renderTasks();
     }
-    task.reviewedBy = value;
-    saveToDatabase();
-    renderTasks();
+    reader.readAsDataURL(file);
 }
 
 // Reset all tasks
@@ -494,7 +491,7 @@ function resetAllTasks(){
         task.completedAt = null;
         task.completedBy = '';
         task.assignee = '';
-        task.images = [];
+        task.images = []; // มั่นใจว่าเป็น array
         task.reviewStatus = 'pending_review';
         task.reviewedBy = '';
         task.reviewedAt = null;
@@ -503,24 +500,42 @@ function resetAllTasks(){
     renderTasks();
 }
 
-// Image upload
-function uploadFile(file, task){
-    const reader = new FileReader();
-    reader.onload = function(e){
-        task.images.push(e.target.result);
-        saveToDatabase();
-        renderTasks();
-    }
-    reader.readAsDataURL(file);
+// อัปเดตผู้ทำงาน
+function updateAssignee(taskId, value){
+    const task = tasks.find(t => t.id === taskId);
+    if(!task) return;
+    task.assignee = value;
+    saveToDatabase();
 }
 
-// View images
-function viewImages(id){
-    const task = tasks.find(t => t.id === id);
-    if (!task || task.images.length === 0) return;
-    const container = document.getElementById('imageModalContent');
-    container.innerHTML = task.images.map(img => `<img src="${img}" class="w-full mb-2 image-preview">`).join('');
-    document.getElementById('imageModal').classList.remove('hidden');
+// อัปเดตผู้ตรวจสอบ
+function updateReviewer(taskId, value){
+    const task = tasks.find(t => t.id === taskId);
+    if(!task) return;
+    task.reviewedBy = value;
+    saveToDatabase();
+}
+
+// เปลี่ยนสถานะงาน (เสร็จ/ยังไม่เสร็จ)
+function toggleTaskStatus(taskId){
+    const task = tasks.find(t => t.id === taskId);
+    if(!task) return;
+    if(task.status === 'pending'){
+        if(!task.assignee || task.assignee.trim() === ''){
+            alert('กรุณากรอกชื่อผู้ทำงานก่อนทำเครื่องหมายเสร็จ');
+            return;
+        }
+        task.status = 'completed';
+        task.completedAt = new Date().toISOString();
+        task.completedBy = task.assignee;
+    } else {
+        task.status = 'pending';
+        task.completedAt = null;
+        task.completedBy = '';
+    }
+    saveToDatabase();
+    renderTasks();
+    if(currentTab === 'summary') renderSummary();
 }
 
 function closeImageModal(){
