@@ -279,9 +279,10 @@ console.log('tasks:', tasks);
     const statusFilter = document.getElementById('statusFilter').value;
 
     let filteredTasks = tasks;
-    if(floorFilter) filteredTasks = filteredTasks.filter(t=>t.floor==floorFilter);
-    if(roomFilter) filteredTasks = filteredTasks.filter(t=>t.room==roomFilter);
-    if(statusFilter) filteredTasks = filteredTasks.filter(t=>t.status===statusFilter);
+if(floorFilter) filteredTasks = filteredTasks.filter(t => String(t.floor) === floorFilter);
+if(roomFilter) filteredTasks = filteredTasks.filter(t => String(t.room) === roomFilter);
+if(statusFilter) filteredTasks = filteredTasks.filter(t => t.status === statusFilter);
+
 
     const groupedTasks={};
     filteredTasks.forEach(task=>{
