@@ -125,15 +125,19 @@ const db = getDatabase(app);
     db.ref("tasks").set(tasks);
   }
 
-  window.loadFromDatabase = function(){
-    db.ref("tasks").on('value', snapshot => {
-      if(snapshot.exists()){
-        tasks = snapshot.val();
-        renderTasks();
-        if(currentTab==='summary') renderSummary();
-      } else initializeTasks();
-    });
-  }
+ window.loadFromDatabase = function(){
+  const tasksRef = db.ref("tasks");
+  tasksRef.on('value', snapshot => {
+    if(snapshot.exists()){
+      const data = snapshot.val();
+      // แปลงเป็น array ถ้าเป็น object
+      tasks = Array.isArray(data) ? data : Object.values(data);
+      renderTasks();
+      if(currentTab==='summary') renderSummary();
+    } else initializeTasks();
+  });
+}
+
 
   window.initializeTasks = function(){
     tasks = [];
@@ -204,6 +208,7 @@ const db = getDatabase(app);
     renderTasks();
     if(currentTab==='summary') renderSummary();
   }
+console.log('tasks:', tasks);
 
   window.uploadFile = function(file, task){
     if(!task.images) task.images=[];
