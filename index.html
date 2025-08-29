@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ระบบติดตามงานแม่บ้าน</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://www.gstatic.com/firebasejs/12.2.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.2.0/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.2.0/firebase-analytics.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
 body { font-family: 'Sarabun', sans-serif; }
@@ -84,133 +87,211 @@ body { font-family: 'Sarabun', sans-serif; }
             <h3 class="text-lg font-semibold">รูปภาพงาน</h3>
             <button onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
         </div>
-        <div id="imageModalContent" class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            </div>
+        <div id="imageModalContent" class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     </div>
 </div>
 
 <script type="module">
   // Import the functions you need from the SDKs you need
-  import { getDatabase, ref, set, onValue } 
-from "https://www.gstatic.com/firebasejs/12.2.0/firebase-database.js";
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.0/firebase-analytics.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
   // TODO: Add SDKs for Firebase products that you want to use
   // https://firebase.google.com/docs/web/setup#available-libraries
 
   // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
- 
   const firebaseConfig = {
-    apiKey: "AIzaSyDxHYua4i21OV_N5Me_5ORsQrQ1unXQuBA",
-    authDomain: "report-jobhk.firebaseapp.com",
-    databaseURL: "https://report-jobhk-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "report-jobhk",
-    storageBucket: "report-jobhk.firebasestorage.app",
-    messagingSenderId: "429684380091",
-    appId: "1:429684380091:web:eb390cf661ff974f25f49e",
-    measurementId: "G-53EZWY79NL"
+    apiKey: "AIzaSyA2szkiP9UyOXR7sGa9ov2lpAsykBQqrX0",
+    authDomain: "wellreport-8b077.firebaseapp.com",
+    projectId: "wellreport-8b077",
+    storageBucket: "wellreport-8b077.firebasestorage.app",
+    messagingSenderId: "511028766274",
+    appId: "1:511028766274:web:9efa70776fcd11e1646fdb"
   };
 
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-  const analytics = getAnalytics(app);
-const floors = {
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const analytics = firebase.analytics();
+  // ====== Data ======
+  const floors = {
     3: Array.from({length: 10}, (_, i) => 301 + i),
     4: Array.from({length: 10}, (_, i) => 401 + i),
     5: Array.from({length: 8}, (_, i) => 501 + i),
     6: Array.from({length: 8}, (_, i) => 601 + i)
-};
-const taskTypes = ['ระเบียงห้อง','กระจกห้องพัก','ซักพรม','ขัดเค้าเตอร์หินอ่อน','ขัดห้องน้ำ','ใส่น้ำตาลมด','ทางเดิน corridor'];
+  };
+  const taskTypes = ['ระเบียงห้อง','กระจกห้องพัก','ซักพรม','ขัดเค้าเตอร์หินอ่อน','ขัดห้องน้ำ','ใส่น้ำตาลมด','ทางเดิน corridor'];
 
-let tasks = [];
-let currentTab = 'tasks';
+  let tasks = [];
+  let currentTab = 'tasks';
 
+  // ====== Functions global ======
+  window.saveToDatabase = function(){
+    db.ref("tasks").set(tasks);
+  }
 
-// บันทึก tasks ลง Firebase
-function saveToDatabase() {
-  set(ref(db, "tasks"), tasks);
-}
+  window.loadFromDatabase = function(){
+    db.ref("tasks").on('value', snapshot => {
+      if(snapshot.exists()){
+        tasks = snapshot.val();
+        renderTasks();
+        if(currentTab==='summary') renderSummary();
+      } else initializeTasks();
+    });
+  }
 
-// โหลด tasks จาก Firebase + sync real-time
-function loadFromDatabase() {
-  const tasksRef = ref(db, "tasks");
-  onValue(tasksRef, (snapshot) => {
-    if (snapshot.exists()) {
-      tasks = snapshot.val();
-      renderTasks();
-      if (currentTab === 'summary') renderSummary();
-    } else {
-      // สร้างค่าเริ่มต้นครั้งเดียว
-      initializeTasks();
-    }
-  });
-}
-
-function initializeTasks() {
-  tasks = [];
-  Object.keys(floors).forEach(floor => {
-    floors[floor].forEach(room => {
-      taskTypes.forEach(taskType => {
-        tasks.push({
-          id: `${floor}-${room}-${taskType}`,
-          floor: floor,
-          room: room,
-          taskType: taskType,
-          assignee: '',
-          status: 'pending',
-          completedAt: null,
-          completedBy: '',
-          reviewStatus: 'pending_review',
-          reviewedBy: '',
-          reviewedAt: null,
-          images: []
+  window.initializeTasks = function(){
+    tasks = [];
+    Object.keys(floors).forEach(floor => {
+      floors[floor].forEach(room => {
+        taskTypes.forEach(taskType => {
+          tasks.push({
+            id: `${floor}-${room}-${taskType}`,
+            floor: floor,
+            room: room,
+            taskType: taskType,
+            assignee: '',
+            status: 'pending',
+            completedAt: null,
+            completedBy: '',
+            reviewStatus: 'pending_review',
+            reviewedBy: '',
+            reviewedAt: null,
+            images: []
+          });
         });
       });
     });
-  });
-  saveToDatabase(); // <-- ใช้ฟังก์ชันนี้แทน saveToDatabaseOnce
-}
+    saveToDatabase();
+  }
 
+  // ====== Task Functions ======
+  window.updateAssignee = function(taskId, value){
+    const task = tasks.find(t=>t.id===taskId);
+    if(!task) return;
+    task.assignee = value;
+    saveToDatabase();
+  }
 
+  window.updateReviewer = function(taskId, value){
+    const task = tasks.find(t=>t.id===taskId);
+    if(!task) return;
+    task.reviewedBy = value;
+    saveToDatabase();
+  }
 
-let initialized = false;
+  window.toggleTaskStatus = function(taskId){
+    const task = tasks.find(t=>t.id===taskId);
+    if(!task) return;
+    if(task.status==='pending'){
+      if(!task.assignee || task.assignee.trim()===''){ alert('กรุณากรอกชื่อผู้ทำงานก่อนทำเครื่องหมายเสร็จ'); return; }
+      task.status = 'completed';
+      task.completedAt = new Date().toISOString();
+      task.completedBy = task.assignee;
+    } else {
+      task.status = 'pending';
+      task.completedAt = null;
+      task.completedBy = '';
+    }
+    saveToDatabase();
+    renderTasks();
+    if(currentTab==='summary') renderSummary();
+  }
 
+  window.toggleReviewStatus = function(taskId){
+    const task = tasks.find(t=>t.id===taskId);
+    if(!task) return;
+    if(task.status!=='completed'){ alert('ไม่สามารถตรวจสอบงานที่ยังไม่เสร็จได้'); return; }
+    if(!task.reviewedBy || task.reviewedBy.trim()===''){ alert('กรุณากรอกชื่อผู้ตรวจสอบก่อน'); return; }
+    task.reviewStatus = task.reviewStatus==='pending_review'?'reviewed':'pending_review';
+    task.reviewedAt = task.reviewStatus==='reviewed'? new Date().toISOString() : null;
+    saveToDatabase();
+    renderTasks();
+    if(currentTab==='summary') renderSummary();
+  }
 
+  window.uploadFile = function(file, task){
+    if(!task.images) task.images=[];
+    const reader = new FileReader();
+    reader.onload = e=>{
+      task.images.push(e.target.result);
+      saveToDatabase();
+      renderTasks();
+    }
+    reader.readAsDataURL(file);
+  }
 
+  window.viewImages = function(id){
+    const task = tasks.find(t=>t.id===id);
+    if(!task || !(task.images && task.images.length)) return;
+    const container = document.getElementById('imageModalContent');
+    container.innerHTML = task.images.map(img=>`<img src="${img}" class="w-full mb-2 image-preview">`).join('');
+    document.getElementById('imageModal').classList.remove('hidden');
+  }
 
+  window.closeImageModal = function(){
+    document.getElementById('imageModal').classList.add('hidden');
+  }
 
-function renderTasks() {
+  window.resetAllTasks = function(){
+    if(!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return;
+    tasks.forEach(task=>{
+      task.status='pending';
+      task.completedAt=null;
+      task.completedBy='';
+      task.assignee='';
+      task.images=[];
+      task.reviewStatus='pending_review';
+      task.reviewedBy='';
+      task.reviewedAt=null;
+    });
+    saveToDatabase();
+    renderTasks();
+  }
+
+  window.showTab = function(tab){
+    currentTab = tab;
+    document.getElementById('tasksTab').className = tab==='tasks'
+      ? 'px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors'
+      : 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors';
+    document.getElementById('summaryTab').className = tab==='summary'
+      ? 'px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors'
+      : 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors';
+    document.getElementById('tasksContent').classList.toggle('hidden', tab!=='tasks');
+    document.getElementById('summaryContent').classList.toggle('hidden', tab!=='summary');
+    if(tab==='tasks') renderTasks();
+    else renderSummary();
+  }
+
+  // ====== Render Tasks & Summary ======
+  window.renderTasks = function(){
     const grid = document.getElementById('tasksGrid');
     const floorFilter = document.getElementById('floorFilter').value;
     const roomFilter = document.getElementById('roomFilter').value;
     const statusFilter = document.getElementById('statusFilter').value;
 
     let filteredTasks = tasks;
-    if (floorFilter) filteredTasks = filteredTasks.filter(t => t.floor == floorFilter);
-    if (roomFilter) filteredTasks = filteredTasks.filter(t => t.room == roomFilter);
-    if (statusFilter) filteredTasks = filteredTasks.filter(t => t.status === statusFilter);
+    if(floorFilter) filteredTasks = filteredTasks.filter(t=>t.floor==floorFilter);
+    if(roomFilter) filteredTasks = filteredTasks.filter(t=>t.room==roomFilter);
+    if(statusFilter) filteredTasks = filteredTasks.filter(t=>t.status===statusFilter);
 
-    const groupedTasks = {};
-    filteredTasks.forEach(task => {
-        const key = `${task.floor}-${task.room}`;
-        if (!groupedTasks[key]) groupedTasks[key] = [];
-        groupedTasks[key].push(task);
+    const groupedTasks={};
+    filteredTasks.forEach(task=>{
+      const key = `${task.floor}-${task.room}`;
+      if(!groupedTasks[key]) groupedTasks[key]=[];
+      groupedTasks[key].push(task);
     });
 
-    grid.innerHTML = '';
-    Object.keys(groupedTasks).forEach(roomKey => {
-        const [floor, room] = roomKey.split('-');
-        const roomTasks = groupedTasks[roomKey];
-        const completedCount = roomTasks.filter(t => t.status === 'completed').length;
-        const totalCount = roomTasks.length;
-        const progressPercent = totalCount ? (completedCount / totalCount) * 100 : 0;
-        const reviewedCount = roomTasks.filter(t => t.reviewStatus === 'reviewed').length;
+    grid.innerHTML='';
+    Object.keys(groupedTasks).forEach(roomKey=>{
+      const [floor, room] = roomKey.split('-');
+      const roomTasks = groupedTasks[roomKey];
+      const completedCount = roomTasks.filter(t=>t.status==='completed').length;
+      const totalCount = roomTasks.length;
+      const progressPercent = totalCount? (completedCount/totalCount*100):0;
 
-        const roomCard = document.createElement('div');
-        roomCard.className = 'bg-white rounded-lg shadow-md overflow-hidden fade-in';
-        roomCard.innerHTML = `
+      const roomCard = document.createElement('div');
+      roomCard.className='bg-white rounded-lg shadow-md overflow-hidden fade-in';
+     roomCard.innerHTML = `
             <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4">
                 <h3 class="text-xl font-bold">🏠 ห้อง ${room} (ชั้น ${floor})</h3>
                 <div class="mt-2">
@@ -253,12 +334,7 @@ function renderTasks() {
                 onchange="Array.from(this.files).forEach(f=>uploadFile(f,tasks.find(t=>t.id==='${task.id}')))" 
                 class="sr-only">
         </label>
-        ${(task.images || []).length > 0 
-    ? `<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">
-        👁️ ดูรูป (${(task.images || []).length})
-      </button>` 
-    : ''}
-
+        ${task.images.length>0?`<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">👁️ ดูรูป (${task.images.length})</button>`:''}
     </div>
 </td>
 
@@ -294,12 +370,21 @@ function renderTasks() {
                     </table>
                 </div>
             </div>`;
-        grid.appendChild(roomCard);
+      roomCard.innerHTML=`<div class="p-4">🏠 ห้อง ${room} (ชั้น ${floor}) - ${completedCount}/${totalCount} งานเสร็จ</div>`;
+      grid.appendChild(roomCard);
     });
     updateProgress();
-}
+  }
 
-function renderSummary() {
+  window.updateProgress = function(){
+    const completed = tasks.filter(t=>t.status==='completed').length;
+    const total = tasks.length;
+    const percent = total? Math.round(completed/total*100) :0;
+    document.getElementById('progressBar').style.width = percent+'%';
+    document.getElementById('progressText').textContent = percent+'%';
+  }
+
+  window.renderSummary = function(){
     const statsContainer = document.getElementById('summaryStats');
     const tableContainer = document.getElementById('summaryTable');
 
@@ -405,169 +490,24 @@ function renderSummary() {
         </table>
     `;
 }
+  
 
-
-// Tab switch
-function showTab(tab) {
-    currentTab = tab;
-    document.getElementById('tasksTab').className = tab === 'tasks' 
-        ? 'px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors'
-        : 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors';
-    document.getElementById('summaryTab').className = tab === 'summary' 
-        ? 'px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors'
-        : 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors';
-    document.getElementById('tasksContent').classList.toggle('hidden', tab !== 'tasks');
-    document.getElementById('summaryContent').classList.toggle('hidden', tab !== 'summary');
-    if (tab === 'tasks') renderTasks();
-    else renderSummary();
-}
-
-// Progress bar update
-function updateProgress(){
-    const completed = tasks.filter(t => t.status === 'completed').length;
-    const total = tasks.length;
-    const percent = total ? Math.round((completed / total) * 100) : 0;
-    const bar = document.getElementById('progressBar');
-    const text = document.getElementById('progressText');
-    bar.style.width = percent + '%';
-    text.textContent = percent + '%';
-}
-
-
-
-// Toggle review status
-function toggleReviewStatus(taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    if (task.status !== 'completed') {
-        alert('ไม่สามารถตรวจสอบงานที่ยังไม่เสร็จได้');
-        return;
-    }
-    if (!task.reviewedBy || task.reviewedBy.trim() === '') {
-        alert('กรุณากรอกชื่อผู้ตรวจสอบก่อน');
-        return;
-    }
-    if (task.reviewStatus === 'pending_review') {
-        task.reviewStatus = 'reviewed';
-        task.reviewedAt = new Date().toISOString();
-    } else {
-        task.reviewStatus = 'pending_review';
-        task.reviewedAt = null;
-    }
-    saveToDatabase();
-    renderTasks();
-    if (currentTab === 'summary') {
-        renderSummary();
-    }
-}
-
-// Update reviewer
-// View images (ปรับ version เดียว)
-function viewImages(id){
-    const task = tasks.find(t => t.id === id);
-    if (!task || !(task.images && task.images.length)) return; // ป้องกัน error
-    const container = document.getElementById('imageModalContent');
-    container.innerHTML = (task.images || []).map(img => `<img src="${img}" class="w-full mb-2 image-preview">`).join('');
-    document.getElementById('imageModal').classList.remove('hidden');
-}
-
-// Image upload
-function uploadFile(file, task){
-    if (!task.images) task.images = []; // ป้องกัน undefined
-    const reader = new FileReader();
-    reader.onload = function(e){
-        task.images.push(e.target.result);
-        saveToDatabase();
-        renderTasks();
-    }
-    reader.readAsDataURL(file);
-}
-
-// Reset all tasks
-function resetAllTasks(){
-    if (!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return;
-    tasks.forEach(task => {
-        task.status = 'pending';
-        task.completedAt = null;
-        task.completedBy = '';
-        task.assignee = '';
-        task.images = []; // มั่นใจว่าเป็น array
-        task.reviewStatus = 'pending_review';
-        task.reviewedBy = '';
-        task.reviewedAt = null;
-    });
-    saveToDatabase();
-    renderTasks();
-}
-
-// อัปเดตผู้ทำงาน
-function updateAssignee(taskId, value){
-    const task = tasks.find(t => t.id === taskId);
-    if(!task) return;
-    task.assignee = value;
-    saveToDatabase();
-}
-
-// อัปเดตผู้ตรวจสอบ
-function updateReviewer(taskId, value){
-    const task = tasks.find(t => t.id === taskId);
-    if(!task) return;
-    task.reviewedBy = value;
-    saveToDatabase();
-}
-
-// เปลี่ยนสถานะงาน (เสร็จ/ยังไม่เสร็จ)
-function toggleTaskStatus(taskId){
-    const task = tasks.find(t => t.id === taskId);
-    if(!task) return;
-    if(task.status === 'pending'){
-        if(!task.assignee || task.assignee.trim() === ''){
-            alert('กรุณากรอกชื่อผู้ทำงานก่อนทำเครื่องหมายเสร็จ');
-            return;
-        }
-        task.status = 'completed';
-        task.completedAt = new Date().toISOString();
-        task.completedBy = task.assignee;
-    } else {
-        task.status = 'pending';
-        task.completedAt = null;
-        task.completedBy = '';
-    }
-    saveToDatabase();
-    renderTasks();
-    if(currentTab === 'summary') renderSummary();
-}
-
-function closeImageModal(){
-    document.getElementById('imageModal').classList.add('hidden');
-}
-
-// Update room filter options
-document.getElementById('floorFilter').addEventListener('change', function(){
+  // ====== Room Filter ======
+  document.getElementById('floorFilter').addEventListener('change', function(){
     const floor = this.value;
     const roomSelect = document.getElementById('roomFilter');
-    roomSelect.innerHTML = `<option value="">ทุกห้อง</option>`;
-    if(floor && floors[floor]){
-        floors[floor].forEach(r => roomSelect.innerHTML += `<option value="${r}">${r}</option>`);
-    }
+    roomSelect.innerHTML=`<option value="">ทุกห้อง</option>`;
+    if(floor && floors[floor]) floors[floor].forEach(r=>roomSelect.innerHTML+=`<option value="${r}">${r}</option>`);
     renderTasks();
-});
+  });
 
-document.getElementById('roomFilter').addEventListener('change', renderTasks);
-document.getElementById('statusFilter').addEventListener('change', renderTasks);
-window.updateAssignee = function(taskId, value){ ... }
-window.toggleTaskStatus = function(taskId){ ... }
-window.updateReviewer = function(taskId, value){ ... }
-window.toggleReviewStatus = function(taskId){ ... }
-window.showTab = function(tab){ ... }
-window.resetAllTasks = function(){ ... }
-window.uploadFile = function(file, task){ ... }
-window.closeImageModal = function(){ ... }
-window.viewImages = function(id){ ... }
+  document.getElementById('roomFilter').addEventListener('change', renderTasks);
+  document.getElementById('statusFilter').addEventListener('change', renderTasks);
 
-// Init
-loadFromDatabase();
-showTab('tasks');
+  // ====== Init ======
+  loadFromDatabase();
+  showTab('tasks');
 </script>
+
 </body>
 </html>
