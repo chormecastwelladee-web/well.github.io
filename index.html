@@ -149,7 +149,7 @@ function loadFromDatabase() {
 }
 
 function initializeTasks() {
-  tasks = []; // สร้าง array ว่างหรือ default task
+  tasks = [];
   Object.keys(floors).forEach(floor => {
     floors[floor].forEach(room => {
       taskTypes.forEach(taskType => {
@@ -170,9 +170,9 @@ function initializeTasks() {
       });
     });
   });
-  // บันทึกค่าเริ่มต้น **ครั้งเดียว** หลังสร้าง
-  saveToDatabaseOnce();
+  saveToDatabase(); // <-- ใช้ฟังก์ชันนี้แทน saveToDatabaseOnce
 }
+
 
 
 let initialized = false;
@@ -555,6 +555,15 @@ document.getElementById('floorFilter').addEventListener('change', function(){
 
 document.getElementById('roomFilter').addEventListener('change', renderTasks);
 document.getElementById('statusFilter').addEventListener('change', renderTasks);
+window.updateAssignee = function(taskId, value){ ... }
+window.toggleTaskStatus = function(taskId){ ... }
+window.updateReviewer = function(taskId, value){ ... }
+window.toggleReviewStatus = function(taskId){ ... }
+window.showTab = function(tab){ ... }
+window.resetAllTasks = function(){ ... }
+window.uploadFile = function(file, task){ ... }
+window.closeImageModal = function(){ ... }
+window.viewImages = function(id){ ... }
 
 // Init
 loadFromDatabase();
