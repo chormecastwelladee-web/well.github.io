@@ -182,6 +182,21 @@ function saveToDatabaseOnce() {
 }
 
 
+
+
+let initialized = false;
+
+function initializeTasksOnce() {
+  if (initialized) return;
+  initialized = true;
+
+  tasks = createDefaultTasks(); // สร้าง array default
+  set(ref(db, "tasks"), tasks) // เขียนค่าเริ่มต้นครั้งเดียว
+    .then(() => console.log("Tasks initialized"));
+}
+
+
+
 function renderTasks() {
     const grid = document.getElementById('tasksGrid');
     const floorFilter = document.getElementById('floorFilter').value;
