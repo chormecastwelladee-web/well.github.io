@@ -142,10 +142,43 @@ function loadFromDatabase() {
       renderTasks();
       if (currentTab === 'summary') renderSummary();
     } else {
-      loadFromDatabase();
-      saveToDatabase();
+      // สร้างค่าเริ่มต้นครั้งเดียว
+      initializeTasks();
     }
   });
+}
+
+function initializeTasks() {
+  tasks = []; // สร้าง array ว่างหรือ default task
+  Object.keys(floors).forEach(floor => {
+    floors[floor].forEach(room => {
+      taskTypes.forEach(taskType => {
+        tasks.push({
+          id: `${floor}-${room}-${taskType}`,
+          floor: floor,
+          room: room,
+          taskType: taskType,
+          assignee: '',
+          status: 'pending',
+          completedAt: null,
+          completedBy: '',
+          reviewStatus: 'pending_review',
+          reviewedBy: '',
+          reviewedAt: null,
+          images: []
+        });
+      });
+    });
+  });
+  // บันทึกค่าเริ่มต้น **ครั้งเดียว** หลังสร้าง
+  saveToDatabaseOnce();
+}
+
+function saveToDatabaseOnce() {
+  const tasksRef = ref(db, "tasks");
+  set(tasksRef, tasks)
+    .then(() => console.log("Tasks initialized."))
+    .catch(err => console.error(err));
 }
 
 
