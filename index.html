@@ -130,13 +130,21 @@ const db = getDatabase(app);
   tasksRef.on('value', snapshot => {
     if(snapshot.exists()){
       const data = snapshot.val();
+      console.log('Raw data from Firebase:', data); // เช็ค data จริง
       // แปลงเป็น array ถ้าเป็น object
       tasks = Array.isArray(data) ? data : Object.values(data);
+      console.log('Tasks after conversion:', tasks); // เช็ค array
       renderTasks();
       if(currentTab==='summary') renderSummary();
-    } else initializeTasks();
+    } else {
+      console.log('No tasks in Firebase, initializing...');
+      initializeTasks();
+    }
+  }, error => {
+    console.error('Firebase load error:', error);
   });
 }
+
 
 
   window.initializeTasks = function(){
