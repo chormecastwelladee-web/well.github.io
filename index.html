@@ -217,81 +217,53 @@
         }
 
         // Firebase functions
-        async function saveToFirebase() {
-            try {
-                const { collection, doc, setDoc } = window.firebaseModules;
-                
-                // Save tasks data
-                await setDoc(doc(window.db, 'housekeeping', 'tasks'), {
-                    tasks: tasks,
-                    lastUpdated: new Date().toISOString(),
-                    lastResetDate: new Date().toDateString()
-                });
-                
-                console.log('ข้อมูลถูกบันทึกลง Firebase เรียบร้อยแล้ว');
-            } catch (error) {
-                console.error('เกิดข้อผิดพลาดในการบันทึกข้อมูล:', error);
-                // Fallback to localStorage
-                localStorage.setItem('housekeepingTasks', JSON.stringify(tasks));
-                localStorage.setItem('lastResetDate', new Date().toDateString());
-            }
-        }
+        function saveToFirebase() {
+    try {
+      const { doc, setDoc } = window.firebaseModules;
+      const tasksDocRef = doc(window.db, 'housekeeping', 'tasks');
+      await setDoc(tasksDocRef, {
+        tasks: tasks,
+        lastUpdated: new Date().toISOString(),
+        lastResetDate: new Date().toDateString() // Corrected: Store a unique reset date
+      });
+      console.log('Data saved to Firestore successfully.');
+    } catch (error) {
+      console.error('Error saving data to Firebase:', error);
+      // Fallback to localStorage if Firebase fails
+      localStorage.setItem('housekeepingTasks', JSON.stringify(tasks));
+    }
+  }
+        function loadFromFirebase() {
+    try {
+      const { doc, getDoc } = window.firebaseModules;
+      const tasksDocRef = doc(window.db, 'housekeeping', 'tasks');
+      const docSnap = await getDoc(tasksDocRef);
 
-        async function loadFromFirebase() {
-            try {
-                const { doc, getDoc } = window.firebaseModules;
-                const docRef = doc(window.db, 'housekeeping', 'tasks');
-                const docSnap = await getDoc(docRef);
-                
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    const lastReset = data.lastResetDate;
-                    
-                    // Check if we need to reset (first day of month)
-                    const today = new Date();
-                    const lastResetDate = lastReset ? new Date(lastReset) : null;
-                    
-                    if (!lastResetDate || (today.getDate() === 1 && today.toDateString() !== lastReset)) {
-                        // Reset all tasks on first day of month
-                        tasks.forEach(task => {
-                            task.status = 'pending';
-                            task.completedAt = null;
-                            task.completedBy = '';
-                        });
-                        await saveToFirebase();
-                        return;
-                    }
-                    
-                    if (data.tasks) {
-                        const savedTasks = data.tasks;
-                        tasks.forEach(task => {
-                            const savedTask = savedTasks.find(t => t.id === task.id);
-                            if (savedTask) {
-                                Object.assign(task, savedTask);
-                            }
-                        });
-                    }
-                    
-                    console.log('โหลดข้อมูลจาก Firebase เรียบร้อยแล้ว');
-                } else {
-                    console.log('ไม่พบข้อมูลใน Firebase, สร้างข้อมูลใหม่');
-                    await saveToFirebase();
-                }
-            } catch (error) {
-                console.error('เกิดข้อผิดพลาดในการโหลดข้อมูล:', error);
-                // Fallback to localStorage
-                const saved = localStorage.getItem('housekeepingTasks');
-                if (saved) {
-                    const savedTasks = JSON.parse(saved);
-                    tasks.forEach(task => {
-                        const savedTask = savedTasks.find(t => t.id === task.id);
-                        if (savedTask) {
-                            Object.assign(task, savedTask);
-                        }
-                    });
-                }
-            }
-        }
+      const today = new Date();
+      const todayDateString = today.toDateString();
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const lastResetDate = data.lastResetDate;
+
+        // Check if it's the first of the month and we haven't reset yet today
+        if (today.getDate() === 1 && todayDateString !== lastResetDate) {
+          console.log('It is the first of the month, resetting all tasks.');
+          initializeTasks(); // This re-initializes tasks to their default 'pending' state
+          await saveToFirebase(); // Save the newly reset tasks
+        } else {
+          // Load data from Firestore if no reset is needed
+          if (data.tasks) {
+            tasks = data.tasks;
+            console.log('Data loaded from Firebase successfully.');
+          }
+        }
+      } else {
+        console.log('No data found in Firebase, initializing new tasks.');
+        initializeTasks();
+        await saveToFirebase();
+      }
+  }
 
         async function uploadImageToFirebase(file, taskId) {
             try {
@@ -327,43 +299,32 @@
 
         // Setup real-time listener
         function setupRealtimeListener() {
-            try {
-                const { doc, onSnapshot } = window.firebaseModules;
-                const docRef = doc(window.db, 'housekeeping', 'tasks');
-                
-                onSnapshot(docRef, (doc) => {
-                    if (doc.exists()) {
-                        const data = doc.data();
-                        if (data.tasks) {
-                            const savedTasks = data.tasks;
-                            tasks.forEach(task => {
-                                const savedTask = savedTasks.find(t => t.id === task.id);
-                                if (savedTask) {
-                                    Object.assign(task, savedTask);
-                                }
-                            });
-                            
-                            // Update UI
-                            if (currentTab === 'tasks') {
-                                renderTasks();
-                            } else {
-                                renderSummary();
-                            }
-                        }
-                    }
-                    updateConnectionStatus('connected');
-                }, (error) => {
-                    console.error('Real-time listener error:', error);
-                    updateConnectionStatus('error');
-                });
-                
-                console.log('เชื่อมต่อ Real-time listener เรียบร้อยแล้ว');
-                updateConnectionStatus('connected');
-            } catch (error) {
-                console.error('เกิดข้อผิดพลาดในการตั้งค่า Real-time listener:', error);
-                updateConnectionStatus('error');
-            }
-        }
+    try {
+      const { doc, onSnapshot } = window.firebaseModules;
+      const tasksDocRef = doc(window.db, 'housekeeping', 'tasks');
+
+      onSnapshot(tasksDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.tasks) {
+            tasks = data.tasks;
+            if (currentTab === 'tasks') {
+              renderTasks();
+            } else {
+              renderSummary();
+            }
+          }
+        }
+        updateConnectionStatus('connected');
+      }, (error) => {
+        console.error('Real-time listener error:', error);
+        updateConnectionStatus('error');
+      });
+    } catch (error) {
+      console.error('Error setting up Real-time listener:', error);
+      updateConnectionStatus('error');
+    }
+  }
 
         function updateConnectionStatus(status) {
             const statusElement = document.getElementById('connectionStatus');
@@ -642,13 +603,9 @@
         }
 
         // Event handlers
-        async function updateAssignee(taskId, assignee) {
-            const task = tasks.find(t => t.id === taskId);
-            if (task) {
-                task.assignee = assignee;
-                await saveToFirebase();
-            }
-        }
+       function updateAssignee(taskId, value) {
+    await updateTask(taskId, { assignee: value });
+  }
 
 
 
@@ -741,65 +698,28 @@
             document.getElementById('inspectionModal').classList.add('hidden');
         }
 
-        async function updateInspectionStatus(taskId, status) {
-            const task = tasks.find(t => t.id === taskId);
-            if (task) {
-                const inspectorNameElement = document.getElementById(`inspectorName-${taskId}`);
-                const notesElement = document.getElementById(`inspectionNotes-${taskId}`);
-                
-                const inspectorName = inspectorNameElement ? inspectorNameElement.value.trim() : '';
-                const notes = notesElement ? notesElement.value : '';
-                
-                if (!inspectorName) {
-                    alert('กรุณากรอกชื่อผู้ตรวจสอบ');
-                    return;
-                }
-                
-                task.inspectionStatus = status;
-                task.inspectionNotes = notes;
-                task.inspectedBy = inspectorName;
-                task.inspectedAt = new Date().toISOString();
-                
-                await saveToFirebase();
-                closeInspectionModal();
-                renderTasks();
-                if (currentTab === 'summary') {
-                    renderSummary();
-                }
-            }
-        }
-
-        async function handleImageUpload(taskId, files) {
-            const task = tasks.find(t => t.id === taskId);
-            if (task && files.length > 0) {
-                const uploadPromises = Array.from(files).map(async (file) => {
-                    if (file.type.startsWith('image/') && task.images.length < 10) {
-                        try {
-                            // Show loading indicator
-                            const loadingDiv = document.createElement('div');
-                            loadingDiv.className = 'text-xs text-blue-600 mt-1';
-                            loadingDiv.textContent = `กำลังอัปโหลด ${file.name}...`;
-                            document.querySelector(`#images-${taskId}`).parentNode.appendChild(loadingDiv);
-                            
-                            const imageData = await uploadImageToFirebase(file, taskId);
-                            task.images.push(imageData);
-                            
-                            // Remove loading indicator
-                            loadingDiv.remove();
-                            
-                            return imageData;
-                        } catch (error) {
-                            console.error('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ:', error);
-                            return null;
-                        }
-                    }
-                });
-                
-                await Promise.all(uploadPromises);
-                await saveToFirebase();
-                renderTasks();
-            }
-        }
+       function updateInspectionStatus(taskId, status, notes, inspector) {
+    await updateTask(taskId, {
+      inspectionStatus: status,
+      inspectionNotes: notes,
+      inspectedBy: inspector,
+      inspectedAt: new Date().toISOString()
+    });
+  }
+async function handleImageUpload(taskId, files) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+ 
+    for (const file of files) {
+      const newImage = await uploadImageToFirebase(file, taskId);
+      if (newImage) {
+        if (!task.images) task.images = [];
+        task.images.push(newImage);
+      }
+    }
+ 
+    await updateTask(taskId, { images: task.images });
+  }
 
         function viewImages(taskId) {
             const task = tasks.find(t => t.id === taskId);
@@ -830,48 +750,33 @@
             document.getElementById('imageModal').classList.add('hidden');
         }
 
-        async function toggleTaskStatus(taskId) {
-            const task = tasks.find(t => t.id === taskId);
-            if (task) {
-                if (task.status === 'pending') {
-                    if (!task.assignee.trim()) {
-                        alert('กรุณากรอกชื่อผู้ทำงานก่อนทำเครื่องหมายเสร็จ');
-                        return;
-                    }
-                    task.status = 'completed';
-                    task.completedAt = new Date().toISOString();
-                    task.completedBy = task.assignee;
-                } else {
-                    task.status = 'pending';
-                    task.completedAt = null;
-                    task.completedBy = '';
-                }
-                await saveToFirebase();
-                renderTasks();
-                if (currentTab === 'summary') {
-                    renderSummary();
-                }
-            }
-        }
+     async function toggleTaskStatus(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
 
-        async function resetAllTasks() {
-            if (confirm('คุณแน่ใจหรือไม่ที่จะรีเซ็ตงานทั้งหมด? การดำเนินการนี้ไม่สามารถยกเลิกได้')) {
-                tasks.forEach(task => {
-                    task.status = 'pending';
-                    task.completedAt = null;
-                    task.completedBy = '';
-                    task.inspectionStatus = 'pending';
-                    task.inspectedAt = null;
-                    task.inspectedBy = '';
-                    task.inspectionNotes = '';
-                });
-                await saveToFirebase();
-                renderTasks();
-                if (currentTab === 'summary') {
-                    renderSummary();
-                }
-            }
-        }
+    if (task.status === 'pending' && !task.assignee) {
+      alert('กรุณากรอกชื่อผู้ทำงานก่อนทำเครื่องหมายเสร็จ');
+      return;
+    }
+
+    const newStatus = task.status === 'pending' ? 'completed' : 'pending';
+    const updates = {
+      status: newStatus,
+      completedAt: newStatus === 'completed' ? new Date().toISOString() : null,
+      completedBy: newStatus === 'completed' ? task.assignee : '',
+      reviewStatus: 'pending', // Reset review status when toggling back
+      inspectedBy: '',
+      inspectedAt: null
+    };
+    await updateTask(taskId, updates);
+  }
+
+
+        function resetAllTasks() {
+    if (!confirm('คุณต้องการรีเซ็ตงานทั้งหมดสำหรับเดือนใหม่ใช่หรือไม่?')) return;
+    initializeTasks();
+    await saveToFirebase();
+  }
 
         function updateProgress() {
             const totalTasks = tasks.length;
