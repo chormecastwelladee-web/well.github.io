@@ -87,7 +87,7 @@ body { font-family: 'Sarabun', sans-serif; }
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/12.2.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.2.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.2.0/firebase-analytics-compat.js"></script>
+
 <script>
   // ====== Global Variables ======
   const floors = {
@@ -100,9 +100,9 @@ body { font-family: 'Sarabun', sans-serif; }
   let tasks = [];
   let currentTab = 'tasks';
 
- const firebaseConfig = {
+  const firebaseConfig = {
     apiKey: "AIzaSyA2szkiP9UyOXR7sGa9ov2lpAsykBQqrX0",
-    databaseURL: "https://wellreport-8b077-default-rtdb.firebaseio.com",
+    databaseURL: "https://wellreport-8b077-default-rtdb.asia-southeast1.firebasedatabase.app",
     authDomain: "wellreport-8b077.firebaseapp.com",
     projectId: "wellreport-8b077",
     storageBucket: "wellreport-8b077.appspot.com",
@@ -140,51 +140,62 @@ body { font-family: 'Sarabun', sans-serif; }
   }
 
   function loadFromDatabase(){
-    const tasksRef = db.ref("tasks");
-    tasksRef.on('value', snapshot=>{
-      if(snapshot.exists()){
-        const data = snapshot.val();
-        tasks = Array.isArray(data)? data : Object.values(data);
-        renderTasks();
-        if(currentTab==='summary') renderSummary();
-      } else {
-        initializeTasks();
-      }
-    });
-  }
+    const tasksRef = db.ref("tasks");
+    tasksRef.once('value', snapshot=>{
+      if(snapshot.exists()){
+        const data = snapshot.val();
+        tasks = Array.isArray(data)? data : Object.values(data);
+      } else {
+        initializeTasks();
+        db.ref("tasks").set(tasks); // Save the newly initialized tasks
+      }
+      renderTasks();
+      if(currentTab==='summary') renderSummary();
+    });
+    // Listen for real-time updates after the initial load
+    tasksRef.on('value', snapshot=>{
+      const data = snapshot.val();
+      tasks = Array.isArray(data)? data : Object.values(data);
+      renderTasks();
+      if(currentTab==='summary') renderSummary();
+    });
+  }
 
   // ====== Task Functions ======
   function updateAssignee(taskId,value){
-    const task = tasks.find(t=>t.id===taskId);
-    if(!task) return;
-    task.assignee=value;
-    db.ref("tasks").set(tasks);
-  }
+    const taskIndex = tasks.findIndex(t=>t.id===taskId);
+    if(taskIndex === -1) return;
+    tasks[taskIndex].assignee = value;
+    db.ref(`tasks/${taskIndex}`).update({assignee: value});
+  }
 
   function updateReviewer(taskId,value){
     const task = tasks.find(t=>t.id===taskId);
     if(!task) return;
     task.reviewedBy=value;
-    db.ref("tasks").set(tasks);
+    
   }
 
   function toggleTaskStatus(taskId){
-    const task = tasks.find(t=>t.id===taskId);
-    if(!task) return;
-    if(task.status==='pending'){
-      if(!task.assignee || task.assignee.trim()===''){ alert('กรุณากรอกชื่อผู้ทำงานก่อนทำเครื่องหมายเสร็จ'); return; }
-      task.status='completed';
-      task.completedAt=new Date().toISOString();
-      task.completedBy=task.assignee;
-    } else {
-      task.status='pending';
-      task.completedAt=null;
-      task.completedBy='';
-    }
-    db.ref("tasks").set(tasks);
-    renderTasks();
-    if(currentTab==='summary') renderSummary();
-  }
+    const taskIndex = tasks.findIndex(t=>t.id===taskId);
+    if(taskIndex === -1) return;
+    const task = tasks[taskIndex];
+    if(task.status === 'pending'){
+      if(!task.assignee || task.assignee.trim() === ''){ alert('กรุณากรอกชื่อผู้ทำงานก่อนทำเครื่องหมายเสร็จ'); return; }
+      task.status = 'completed';
+      task.completedAt = new Date().toISOString();
+      task.completedBy = task.assignee;
+    } else {
+      task.status = 'pending';
+      task.completedAt = null;
+      task.completedBy = '';
+    }
+    db.ref(`tasks/${taskIndex}`).update({
+      status: task.status,
+      completedAt: task.completedAt,
+      completedBy: task.completedBy
+    });
+  }
 
   function toggleReviewStatus(taskId){
     const task = tasks.find(t=>t.id===taskId);
@@ -192,21 +203,23 @@ body { font-family: 'Sarabun', sans-serif; }
     if(!task.reviewedBy || task.reviewedBy.trim()===''){ alert('กรุณากรอกชื่อผู้ตรวจสอบก่อน'); return; }
     task.reviewStatus = task.reviewStatus==='pending_review'? 'reviewed' : 'pending_review';
     task.reviewedAt = task.reviewStatus==='reviewed'? new Date().toISOString() : null;
-    db.ref("tasks").set(tasks);
+    db.ref("tasks").update(tasks);
     renderTasks();
     if(currentTab==='summary') renderSummary();
   }
 
-  function uploadFile(file,task){
-    if(!task.images) task.images=[];
-    const reader = new FileReader();
-    reader.onload=e=>{
-      task.images.push(e.target.result);
-      db.ref("tasks").set(tasks);
-      renderTasks();
-    }
-    reader.readAsDataURL(file);
-  }
+  function uploadFile(file, task){
+    const taskIndex = tasks.findIndex(t=>t.id===task.id);
+    if(taskIndex === -1) return;
+    if(!tasks[taskIndex].images) tasks[taskIndex].images = [];
+    const reader = new FileReader();
+    reader.onload = e => {
+      tasks[taskIndex].images.push(e.target.result);
+      db.ref(`tasks/${taskIndex}`).update({ images: tasks[taskIndex].images });
+      renderTasks();
+    }
+    reader.readAsDataURL(file);
+  }
 
   function viewImages(id){
     const task = tasks.find(t=>t.id===id);
@@ -230,7 +243,7 @@ body { font-family: 'Sarabun', sans-serif; }
       task.reviewedBy='';
       task.reviewedAt=null;
     });
-    db.ref("tasks").set(tasks);
+    
     renderTasks();
   }
 
@@ -307,9 +320,9 @@ body { font-family: 'Sarabun', sans-serif; }
                         <tr class="border-b hover:bg-gray-50 ${task.status === 'completed' ? 'bg-green-100' : ''}">
                             <td class="py-3 font-medium">${task.taskType}</td>
                             <td class="py-3">
-                                <input type="text" value="${task.assignee}" onchange="updateAssignee('${task.id}',this.value)" placeholder="ชื่อผู้ทำงาน"
-                                    ${task.status === 'completed' ? 'disabled' : ''} 
-                                    class="w-full px-2 py-1 border rounded text-xs ${task.status === 'completed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-blue-500'}">
+                               <input type="text" value="${task.reviewedBy}" onchange="updateReviewer('${task.id}',this.value)" placeholder="ชื่อผู้ตรวจสอบ"
+                                    ${task.reviewStatus === 'reviewed' ? 'disabled' : ''} 
+                                    class="w-full px-2 py-1 border rounded text-xs ${task.reviewStatus === 'reviewed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-purple-500'}">
                             </td>
                             <td class="py-3">
                                 <div class="flex items-center space-x-2">
