@@ -391,6 +391,46 @@ function renderSummary() {
     `;
 }
 
+async function checkAndInitializeTasks() {
+    const q = collection(db, "housekeepingTasks");
+    onSnapshot(q, async (snapshot) => {
+        if (snapshot.empty) {
+            // Firestore ว่าง สร้าง tasks ใหม่
+            tasks = [];
+            Object.keys(floors).forEach(floor => {
+                floors[floor].forEach(room => {
+                    taskTypes.forEach(taskType => {
+                        const newTask = {
+                            id: `${floor}-${room}-${taskType}`,
+                            floor: floor,
+                            room: room,
+                            taskType: taskType,
+                            status: 'pending',
+                            reviewStatus: 'pending_review',
+                            assignee: '',
+                            reviewedBy: '',
+                            images: [],
+                            completedAt: null,
+                            completedBy: '',
+                            reviewedAt: null
+                        };
+                        tasks.push(newTask);
+                        setDoc(doc(db, "housekeepingTasks", newTask.id), newTask);
+                    });
+                });
+            });
+        } else {
+            // Firestore มีข้อมูล ดึงเข้ามา
+            tasks = [];
+            snapshot.forEach(doc => tasks.push(doc.data()));
+        }
+        renderTasks();
+        if (currentTab === 'summary') renderSummary();
+    });
+}
+
+
+    
 // Tab switch
 function showTab(tab) {
     currentTab = tab;
@@ -553,7 +593,7 @@ document.getElementById('roomFilter').addEventListener('change', renderTasks);
 document.getElementById('statusFilter').addEventListener('change', renderTasks);
 
 // Init
-initializeTasks();
+checkAndInitializeTasks();
 showTab('tasks');
 </script>
 </body>
