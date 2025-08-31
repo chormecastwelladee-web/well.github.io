@@ -89,34 +89,7 @@ body { font-family: 'Sarabun', sans-serif; }
     </div>
 </div>
 
-<script type="module">
- import { getFirestore, doc, setDoc, collection, onSnapshot } 
-  from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
- import { getStorage, ref, uploadBytes, getDownloadURL } 
-  from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
-
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyDsfzKP6MzJXEd1iQyDqPM9qfusAWoq-ks",
-    authDomain: "hkreport.firebaseapp.com",
-    databaseURL: "https://hkreport-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "hkreport",
-    storageBucket: "hkreport.appspot.com", // ✅
-    messagingSenderId: "916615894132",
-    appId: "1:916615894132:web:20d0c70fe203ff99eaad21"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const storage = getStorage(app);
-
-    
+<script>
 const floors = {
     3: Array.from({length: 10}, (_, i) => 301 + i),
     4: Array.from({length: 10}, (_, i) => 401 + i),
@@ -151,25 +124,50 @@ function initializeTasks() {
             });
         });
     });
-   loadTasksRealtime();
+    loadFromStorage();
 }
 
-async function saveToFirestore(task) {
-  const taskRef = doc(db, "housekeepingTasks", task.id);
-  await setDoc(taskRef, task, { merge: true });
+function saveToStorage() {
+    localStorage.setItem('housekeepingTasks', JSON.stringify(tasks));
+    localStorage.setItem('lastResetDate', new Date().toDateString());
 }
 
+function loadFromStorage() {
+    const saved = localStorage.getItem('housekeepingTasks');
+    const lastReset = localStorage.getItem('lastResetDate');
+    const today = new Date();
+    const lastResetDate = lastReset ? new Date(lastReset) : null;
 
-function loadTasksRealtime() {
-  const q = collection(db, "housekeepingTasks");
-  onSnapshot(q, (snapshot) => {
-    tasks = [];
-    snapshot.forEach(doc => tasks.push(doc.data()));
-    renderTasks();
-    if (currentTab === 'summary') renderSummary();
-  });
+    if (!lastResetDate || (today.getDate() === 1 && today.toDateString() !== lastReset)) {
+        tasks.forEach(task => {
+            task.status = 'pending';
+            task.completedAt = null;
+            task.completedBy = '';
+            task.assignee = '';
+            task.images = [];
+            task.reviewStatus = 'pending_review';
+            task.reviewedBy = '';
+            task.reviewedAt = null;
+        });
+        saveToStorage();
+        return;
+    }
+
+    if (saved) {
+        const savedTasks = JSON.parse(saved);
+        tasks.forEach(task => {
+            const savedTask = savedTasks.find(t => t.id === task.id);
+            if (savedTask) {
+                Object.assign(task, savedTask);
+                if (savedTask.reviewStatus === undefined) {
+                    task.reviewStatus = 'pending_review';
+                    task.reviewedBy = '';
+                    task.reviewedAt = null;
+                }
+            }
+        });
+    }
 }
-
 
 function renderTasks() {
     const grid = document.getElementById('tasksGrid');
@@ -391,46 +389,6 @@ function renderSummary() {
     `;
 }
 
-async function checkAndInitializeTasks() {
-    const q = collection(db, "housekeepingTasks");
-    onSnapshot(q, async (snapshot) => {
-        if (snapshot.empty) {
-            // Firestore ว่าง สร้าง tasks ใหม่
-            tasks = [];
-            Object.keys(floors).forEach(floor => {
-                floors[floor].forEach(room => {
-                    taskTypes.forEach(taskType => {
-                        const newTask = {
-                            id: `${floor}-${room}-${taskType}`,
-                            floor: floor,
-                            room: room,
-                            taskType: taskType,
-                            status: 'pending',
-                            reviewStatus: 'pending_review',
-                            assignee: '',
-                            reviewedBy: '',
-                            images: [],
-                            completedAt: null,
-                            completedBy: '',
-                            reviewedAt: null
-                        };
-                        tasks.push(newTask);
-                        setDoc(doc(db, "housekeepingTasks", newTask.id), newTask);
-                    });
-                });
-            });
-        } else {
-            // Firestore มีข้อมูล ดึงเข้ามา
-            tasks = [];
-            snapshot.forEach(doc => tasks.push(doc.data()));
-        }
-        renderTasks();
-        if (currentTab === 'summary') renderSummary();
-    });
-}
-
-
-    
 // Tab switch
 function showTab(tab) {
     currentTab = tab;
@@ -458,39 +416,45 @@ function updateProgress(){
 }
 
 // Toggle task status
-async function toggleTaskStatus(taskId) {
-  const task = tasks.find(t => t.id === taskId);
-  if (!task) return;
-  if (!task.assignee || task.assignee.trim() === '') {
-  alert('กรุณากรอกชื่อผู้จัดทำก่อน');
-  return;
+function toggleTaskStatus(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (!task.assignee || task.assignee.trim() === '') {
+        alert('กรุณากรอกชื่อผู้จัดทำก่อน');
+        return;
+    }
+    if (task.status === 'pending') {
+        task.status = 'completed';
+        task.completedAt = new Date().toISOString();
+        task.completedBy = task.assignee;
+    } else {
+        task.status = 'pending';
+        task.completedAt = null;
+        task.completedBy = '';
+        task.reviewStatus = 'pending_review';
+        task.reviewedBy = '';
+        task.reviewedAt = null;
+    }
+    saveToStorage();
+    renderTasks();
+    if (currentTab === 'summary') {
+        renderSummary();
+    }
 }
-
-  if (task.status === 'pending') {
-    task.status = 'completed';
-    task.completedAt = new Date().toISOString();
-    task.completedBy = task.assignee;
-  } else {
-    task.status = 'pending';
-    task.completedAt = null;
-    task.completedBy = '';
-    task.reviewStatus = 'pending_review';
-    task.reviewedBy = '';
-    task.reviewedAt = null;
-  }
-  await saveToFirestore(task);
-}
-
 
 // Update assignee
-async function updateAssignee(id, value) {
+function updateAssignee(id, value) {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
-    if (task.status === 'completed') return; // งานเสร็จแล้วแก้ไม่ได้
+    if (task.status === 'completed') {
+        alert('ไม่สามารถแก้ไขชื่อผู้ทำงานได้ เนื่องจากงานนี้เสร็จเรียบร้อยแล้ว');
+        renderTasks(); 
+        return;
+    }
     task.assignee = value;
-    await saveToFirestore(task); // รอให้ Firestore บันทึกเสร็จ
+    saveToStorage();
+    renderTasks();
 }
-
 
 // Toggle review status
 function toggleReviewStatus(taskId) {
@@ -511,7 +475,7 @@ function toggleReviewStatus(taskId) {
         task.reviewStatus = 'pending_review';
         task.reviewedAt = null;
     }
-    saveToFirestore(task);
+    saveToStorage();
     renderTasks();
     if (currentTab === 'summary') {
         renderSummary();
@@ -528,15 +492,14 @@ function updateReviewer(id, value) {
         return;
     }
     task.reviewedBy = value;
-    saveToFirestore(task);
+    saveToStorage();
     renderTasks();
 }
 
 // Reset all tasks
-// Reset all tasks
-async function resetAllTasks(){
+function resetAllTasks(){
     if (!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return;
-    await Promise.all(tasks.map(task => {
+    tasks.forEach(task => {
         task.status = 'pending';
         task.completedAt = null;
         task.completedBy = '';
@@ -545,22 +508,21 @@ async function resetAllTasks(){
         task.reviewStatus = 'pending_review';
         task.reviewedBy = '';
         task.reviewedAt = null;
-        return saveToFirestore(task);
-    }));
+    });
+    saveToStorage();
     renderTasks();
 }
 
 // Image upload
-async function uploadFile(file, task) {
-  const storageRef = ref(storage, `tasks/${task.id}/${file.name}`);
-  await uploadBytes(storageRef, file);
-  const downloadURL = await getDownloadURL(storageRef);
-
-  task.images.push(downloadURL);
-  await saveToFirestore(task);
-  renderTasks();
+function uploadFile(file, task){
+    const reader = new FileReader();
+    reader.onload = function(e){
+        task.images.push(e.target.result);
+        saveToStorage();
+        renderTasks();
+    }
+    reader.readAsDataURL(file);
 }
-
 
 // View images
 function viewImages(id){
@@ -590,7 +552,7 @@ document.getElementById('roomFilter').addEventListener('change', renderTasks);
 document.getElementById('statusFilter').addEventListener('change', renderTasks);
 
 // Init
-checkAndInitializeTasks();
+initializeTasks();
 showTab('tasks');
 </script>
 </body>
