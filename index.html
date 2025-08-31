@@ -231,12 +231,12 @@ function renderTasks() {
                             <tr class="border-b hover:bg-gray-50 ${task.status === 'completed' ? 'bg-green-100' : ''}">
                                 <td class="py-3 font-medium">${task.taskType}</td>
                                 <td class="py-3">
-                                    <input type="text" value="${task.assignee}" placeholder="ชื่อผู้ทำงาน"
+                                   <div class="flex space-x-1">
+  <input type="text" value="${task.assignee}" placeholder="ชื่อผู้ทำงาน"
          class="w-full px-2 py-1 border rounded text-xs"
          id="assignee-${task.id}">
   <button onclick="saveAssignee('${task.id}')" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">💾</button>
-  ${task.status === 'completed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-blue-500'}"
-       inputmode="text" autocomplete="off">
+</div>
 
                                 </td>
                                 <td class="py-3">
