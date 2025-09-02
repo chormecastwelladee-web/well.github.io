@@ -136,16 +136,16 @@ async function submitTask(task) {
 }
 
 
-
 async function loadTasks() {
-  const response = await fetch('https://script.google.com/macros/s/AKfycbyT97s3IGib9mE2zA5SmfGNe3S1UD7tGJI7hrHKe0M9rZRBz0Au--tLcR3DbkxyUlSS/exec'); // ใส่ URL ที่ได้จากขั้นตอน 3
+  const response = await fetch('https://script.google.com/macros/s/AKfycbyT97s3IGib9mE2zA5SmfGNe3S1UD7tGJI7hrHKe0M9rZRBz0Au--tLcR3DbkxyUlSS/exec');
   tasks = await response.json();
-  renderTasks();
-}
 
-// โหลดข้อมูลทุก 10 วินาที
-setInterval(loadTasks, 10000);
-loadTasks();
+  // ถ้า user กำลังพิมพ์ input ให้ไม่ render
+  const focused = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
+  if (!focused) {
+      renderTasks();
+  }
+}
 
 
 
@@ -159,7 +159,7 @@ function renderTasks() {
 
     let filteredTasks = tasks;
     if (floorFilter) filteredTasks = filteredTasks.filter(t => t.floor == floorFilter);
-    if (roomFilter) filteredTa  sks = filteredTasks.filter(t => t.room == roomFilter);
+    if (roomFilter) filteredTasks = filteredTasks.filter(t => t.room == roomFilter);
     if (statusFilter) filteredTasks = filteredTasks.filter(t => t.status === statusFilter);
 
     const groupedTasks = {};
@@ -211,7 +211,7 @@ function renderTasks() {
                             <tr class="border-b hover:bg-gray-50 ${task.status === 'completed' ? 'bg-green-100' : ''}">
                                 <td class="py-3 font-medium">${task.taskType}</td>
                                 <td class="py-3">
-                                    <input type="text" value="${task.assignee}" onchange="updateAssignee('${task.id}',this.value)" placeholder="ชื่อผู้ทำงาน"
+                                    <input type="text" value="${task.assignee}" onblur="updateAssignee('${task.id}',this.value)" placeholder="ชื่อผู้ทำงาน"
                                         ${task.status === 'completed' ? 'disabled' : ''} 
                                         class="w-full px-2 py-1 border rounded text-xs ${task.status === 'completed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-blue-500'}">
                                 </td>
@@ -240,7 +240,7 @@ function renderTasks() {
                                     </span>
                                     ${task.reviewedAt?`<div class="text-xs text-gray-500 mt-1">${new Date(task.reviewedAt).toLocaleString('th-TH')}</div>`:''}
                                     ${task.reviewedBy?`<div class="text-xs text-gray-500">โดย: ${task.reviewedBy}</div>`:''}
-                                    <input type="text" value="${task.reviewedBy}" onchange="updateReviewer('${task.id}', this.value)" placeholder="ชื่อผู้ตรวจสอบ"
+                                    <input type="text" value="${task.reviewedBy}" onblur="updateReviewer('${task.id}', this.value)" placeholder="ชื่อผู้ตรวจสอบ"
                                         ${task.reviewStatus === 'reviewed' ? 'disabled' : ''}
                                         class="w-full px-2 py-1 border rounded text-xs mt-2 ${task.reviewStatus === 'reviewed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-purple-500'}">
                                 </td>
@@ -435,7 +435,7 @@ function updateAssignee(id, value) {
     }
     task.assignee = value;
     submitTask(task)
-    renderTasks();
+    
 }
 
 // Toggle review status
@@ -475,7 +475,7 @@ function updateReviewer(id, value) {
     }
     task.reviewedBy = value;
     submitTask(task)
-    renderTasks();
+    
 }
 
 // Reset all tasks
@@ -487,7 +487,7 @@ function uploadFile(file, task){
     reader.onload = function(e){
         task.images.push(e.target.result);
         submitTask(task)
-        renderTasks();
+       
     }
     reader.readAsDataURL(file);
 }
@@ -531,7 +531,6 @@ document.getElementById('floorFilter').addEventListener('change', function(){
     if(floor && floors[floor]){
         floors[floor].forEach(r => roomSelect.innerHTML += `<option value="${r}">${r}</option>`);
     }
-    renderTasks();
 });
 
 document.getElementById('roomFilter').addEventListener('change', renderTasks);
@@ -540,6 +539,7 @@ document.getElementById('statusFilter').addEventListener('change', renderTasks);
 // Init
 initializeTasks();
 showTab('tasks');
+setInterval(loadTasks, 10000);
 </script>
 </body>
 </html>
