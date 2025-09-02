@@ -89,6 +89,7 @@ body { font-family: 'Sarabun', sans-serif; }
 </div>
 
 <script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyT97s3IGib9mE2zA5SmfGNe3S1UD7tGJI7hrHKe0M9rZRBz0Au--tLcR3DbkxyUlSS/exec';
 const floors = {
     3: Array.from({length: 10}, (_, i) => 301 + i),
     4: Array.from({length: 10}, (_, i) => 401 + i),
@@ -288,6 +289,7 @@ function uploadFile(file, task){
     reader.onload = async function(e){
         task.images.push(e.target.result);
         await submitTask(task);
+        renderTasks();
     }
     reader.readAsDataURL(file);
 }
