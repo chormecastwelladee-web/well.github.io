@@ -127,32 +127,20 @@ function initializeTasks() {
     loadFromStorage();
 }
 
-function saveToStorage() {
-    localStorage.setItem('housekeepingTasks', JSON.stringify(tasks));
-    localStorage.setItem('lastResetDate', new Date().toDateString());
-}
-
 async function submitTask(task) {
-  const response = await fetch("https://script.google.com/macros/s/AKfycbyOooq7RgvfSk1G8eaIf_mqJA2ofHCpmCmU4hyRVNuZKl89z8ikQXf6RZg-9KSahRuq/exec", {
-    method: "POST",
+  await fetch('https://script.google.com/macros/s/AKfycbyT97s3IGib9mE2zA5SmfGNe3S1UD7tGJI7hrHKe0M9rZRBz0Au--tLcR3DbkxyUlSS/exec', {
+    method: 'POST',
     body: JSON.stringify(task)
   });
-  const result = await response.json();
-  console.log(result);
+  loadTasks(); // โหลดข้อมูลใหม่
 }
+
+
+
 async function loadTasks() {
-  const response = await fetch("https://script.google.com/macros/s/AKfycbyOooq7RgvfSk1G8eaIf_mqJA2ofHCpmCmU4hyRVNuZKl89z8ikQXf6RZg-9KSahRuq/exec");
-  const tasks = await response.json();
-  
-  const container = document.getElementById("taskList");
-  container.innerHTML = tasks.map(t => `
-    <div class="p-2 border rounded mb-2">
-      <strong>${t.room}</strong> (${t.taskType}) <br>
-      👩‍🦱 ผู้ทำ: ${t.assignee} <br>
-      📌 สถานะ: ${t.status} <br>
-      ${t.imageUrl ? `<img src="${t.imageUrl}" width="100">` : ""}
-    </div>
-  `).join("");
+  const response = await fetch('https://script.google.com/macros/s/AKfycbyT97s3IGib9mE2zA5SmfGNe3S1UD7tGJI7hrHKe0M9rZRBz0Au--tLcR3DbkxyUlSS/exec'); // ใส่ URL ที่ได้จากขั้นตอน 3
+  tasks = await response.json();
+  renderTasks();
 }
 
 // โหลดข้อมูลทุก 10 วินาที
@@ -161,42 +149,7 @@ loadTasks();
 
 
 
-function loadFromStorage() {
-    const saved = localStorage.getItem('housekeepingTasks');
-    const lastReset = localStorage.getItem('lastResetDate');
-    const today = new Date();
-    const lastResetDate = lastReset ? new Date(lastReset) : null;
 
-    if (!lastResetDate || (today.getDate() === 1 && today.toDateString() !== lastReset)) {
-        tasks.forEach(task => {
-            task.status = 'pending';
-            task.completedAt = null;
-            task.completedBy = '';
-            task.assignee = '';
-            task.images = [];
-            task.reviewStatus = 'pending_review';
-            task.reviewedBy = '';
-            task.reviewedAt = null;
-        });
-        saveToStorage();
-        return;
-    }
-
-    if (saved) {
-        const savedTasks = JSON.parse(saved);
-        tasks.forEach(task => {
-            const savedTask = savedTasks.find(t => t.id === task.id);
-            if (savedTask) {
-                Object.assign(task, savedTask);
-                if (savedTask.reviewStatus === undefined) {
-                    task.reviewStatus = 'pending_review';
-                    task.reviewedBy = '';
-                    task.reviewedAt = null;
-                }
-            }
-        });
-    }
-}
 
 function renderTasks() {
     const grid = document.getElementById('tasksGrid');
@@ -206,7 +159,7 @@ function renderTasks() {
 
     let filteredTasks = tasks;
     if (floorFilter) filteredTasks = filteredTasks.filter(t => t.floor == floorFilter);
-    if (roomFilter) filteredTasks = filteredTasks.filter(t => t.room == roomFilter);
+    if (roomFilter) filteredTa  sks = filteredTasks.filter(t => t.room == roomFilter);
     if (statusFilter) filteredTasks = filteredTasks.filter(t => t.status === statusFilter);
 
     const groupedTasks = {};
@@ -464,7 +417,7 @@ function toggleTaskStatus(taskId) {
         task.reviewedBy = '';
         task.reviewedAt = null;
     }
-    saveToStorage();
+    submitTask(task)
     renderTasks();
     if (currentTab === 'summary') {
         renderSummary();
@@ -481,7 +434,7 @@ function updateAssignee(id, value) {
         return;
     }
     task.assignee = value;
-    saveToStorage();
+    submitTask(task)
     renderTasks();
 }
 
@@ -504,7 +457,7 @@ function toggleReviewStatus(taskId) {
         task.reviewStatus = 'pending_review';
         task.reviewedAt = null;
     }
-    saveToStorage();
+    submitTask(task)
     renderTasks();
     if (currentTab === 'summary') {
         renderSummary();
@@ -521,37 +474,41 @@ function updateReviewer(id, value) {
         return;
     }
     task.reviewedBy = value;
-    saveToStorage();
+    submitTask(task)
     renderTasks();
 }
 
 // Reset all tasks
-function resetAllTasks(){
-    if (!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return;
-    tasks.forEach(task => {
-        task.status = 'pending';
-        task.completedAt = null;
-        task.completedBy = '';
-        task.assignee = '';
-        task.images = [];
-        task.reviewStatus = 'pending_review';
-        task.reviewedBy = '';
-        task.reviewedAt = null;
-    });
-    saveToStorage();
-    renderTasks();
-}
+
 
 // Image upload
 function uploadFile(file, task){
     const reader = new FileReader();
     reader.onload = function(e){
         task.images.push(e.target.result);
-        saveToStorage();
+        submitTask(task)
         renderTasks();
     }
     reader.readAsDataURL(file);
 }
+
+function resetAllTasks(){
+    if(confirm('คุณแน่ใจหรือไม่ว่าจะรีเซ็ตทุกงาน?')){
+        tasks.forEach(task => {
+            task.status = 'pending';
+            task.completedAt = null;
+            task.completedBy = '';
+            task.reviewStatus = 'pending_review';
+            task.reviewedBy = '';
+            task.reviewedAt = null;
+            task.images = [];
+            submitTask(task);
+        });
+        renderTasks();
+        if(currentTab==='summary') renderSummary();
+    }
+}
+
 
 // View images
 function viewImages(id){
