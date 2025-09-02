@@ -104,8 +104,14 @@ let currentTab = 'tasks';
 // โหลดข้อมูลจาก server
 async function loadTasks() {
   try {
-    const res = await fetch('https://script.google.com/macros/s/YOUR_WEB_APP_ID/exec');
-    const text = await res.text(); // HtmlService ส่ง text
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyT97s3IGib9mE2zA5SmfGNe3S1UD7tGJI7hrHKe0M9rZRBz0Au--tLcR3DbkxyUlSS/exec';
+    
+    // เรียก fetch ก่อน
+    const res = await fetch(https://script.google.com/macros/s/AKfycbyT97s3IGib9mE2zA5SmfGNe3S1UD7tGJI7hrHKe0M9rZRBz0Au--tLcR3DbkxyUlSS/exec);
+    
+    // HtmlService ส่ง text
+    const text = await res.text();
+    
     const tasks = JSON.parse(text);
     console.log(tasks);
     renderTasks(tasks);
@@ -113,6 +119,7 @@ async function loadTasks() {
     console.error('โหลดงานล้มเหลว', e);
   }
 }
+
 
 async function submitTask(task) {
   await fetch('https://script.google.com/macros/s/YOUR_WEB_APP_ID/exec', {
