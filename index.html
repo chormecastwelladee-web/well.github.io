@@ -12,7 +12,6 @@ body { font-family: 'Sarabun', sans-serif; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .image-preview { transition: all 0.3s ease; }
 .image-preview:hover { transform: scale(1.05); }
-
 </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -86,39 +85,26 @@ body { font-family: 'Sarabun', sans-serif; }
             <button onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
         </div>
         <div id="imageModalContent" class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            </div>
+        </div>
     </div>
 </div>
 
-
 <script type="module">
-import { getFirestore, doc, setDoc, getDoc, getDocs, collection, updateDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
-  // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+import { getFirestore, collection, doc, setDoc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
+// Firebase config
+const firebaseConfig = {
     apiKey: "AIzaSyBiiIBJWboGwNlxp0489Mf-ZUn4DOPQGtQ",
     authDomain: "notihk-9cf44.firebaseapp.com",
     projectId: "notihk-9cf44",
-    storageBucket: "notihk-9cf44.firebasestorage.app",
+    storageBucket: "notihk-9cf44.appspot.com",
     messagingSenderId: "451924097131",
     appId: "1:451924097131:web:c90ab0c8ad0ed86a13d92e"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-
-
-// Firestore
+};
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const tasksCollection = collection(db, "housekeepingTasks");
-
-// Storage
-const storage = getStorage(app);
 
 const floors = {
     3: Array.from({length: 10}, (_, i) => 301 + i),
@@ -131,8 +117,6 @@ const taskTypes = ['ระเบียงห้อง','กระจกห้อ
 let tasks = [];
 let currentTab = 'tasks';
 
-
-// Initialize tasks
 async function initializeTasks() {
     tasks = [];
     Object.keys(floors).forEach(floor => {
@@ -156,57 +140,40 @@ async function initializeTasks() {
         });
     });
     await loadTasksFromFirebase();
+    renderTasks();
 }
 
-
-import { writeBatch } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
-
-async function saveToFirebase() {
-    const batch = writeBatch(db);
-    tasks.forEach(task => {
-        const docRef = doc(db, "housekeepingTasks", task.id);
-        batch.set(docRef, task);
-    });
-    await batch.commit();
-    console.log("Saved all tasks to Firebase");
-}
-
-async function saveTaskToFirebase(task) {
-  try {
-    await setDoc(doc(tasksCollection, task.id), task);
-    console.log("Saved task:", task.id);
-  } catch (err) {
-    console.error("Error saving task:", err);
-  }
+// Firebase save/load
+async function saveTaskToFirebase(task){
+    try {
+        await setDoc(doc(db, "housekeepingTasks", task.id), task);
+        console.log(`Saved task: ${task.id}`);
+    } catch(err) {
+        console.error("Error saving task:", err);
+    }
 }
 
 async function loadTasksFromFirebase() {
-  try {
-    const snapshot = await getDocs(tasksCollection);
-    const loadedTasks = [];
-    snapshot.forEach(docSnap => {
-      loadedTasks.push(docSnap.data());
-    });
-    tasks = loadedTasks; // แทนที่ tasks ของคุณ
-    renderTasks();
-  } catch (err) {
-    console.error("Error loading tasks:", err);
-  }
+    try {
+        const snapshot = await getDocs(tasksCollection);
+        snapshot.forEach(docSnap => {
+            const savedTask = docSnap.data();
+            const task = tasks.find(t => t.id === savedTask.id);
+            if(task) Object.assign(task, savedTask);
+        });
+    } catch (err) {
+        console.error("Error loading tasks:", err);
+    }
 }
 
-
-async function loadFromFirebase() {
-    const snapshot = await getDocs(tasksCollection);
-    snapshot.forEach(docSnap => {
-        const savedTask = docSnap.data();
-        const task = tasks.find(t => t.id === savedTask.id);
-        if(task) Object.assign(task, savedTask);
-    });
-    renderTasks();
+async function saveToFirebase() {
+    const batch = writeBatch(db);
+    tasks.forEach(task => batch.set(doc(db, "housekeepingTasks", task.id), task));
+    try { await batch.commit(); console.log("Saved all tasks"); } 
+    catch(err) { console.error(err); }
 }
 
-
-
+// --- UI Functions ---
 function renderTasks() {
     const grid = document.getElementById('tasksGrid');
     const floorFilter = document.getElementById('floorFilter').value;
@@ -232,7 +199,6 @@ function renderTasks() {
         const completedCount = roomTasks.filter(t => t.status === 'completed').length;
         const totalCount = roomTasks.length;
         const progressPercent = totalCount ? (completedCount / totalCount) * 100 : 0;
-        const reviewedCount = roomTasks.filter(t => t.reviewStatus === 'reviewed').length;
 
         const roomCard = document.createElement('div');
         roomCard.className = 'bg-white rounded-lg shadow-md overflow-hidden fade-in';
@@ -272,30 +238,23 @@ function renderTasks() {
                                         class="w-full px-2 py-1 border rounded text-xs ${task.status === 'completed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-blue-500'}">
                                 </td>
                                 <td class="py-3">
-    <div class="flex items-center space-x-2">
-        <label class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 cursor-pointer">
-            📷 เพิ่มรูป
-            <input type="file" id="images-${task.id}" multiple accept="image/*"
-                onchange="Array.from(this.files).forEach(f=>uploadFile(f,tasks.find(t=>t.id==='${task.id}')))" 
-                class="sr-only">
-        </label>
-        ${task.images.length>0?`<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">👁️ ดูรูป (${task.images.length})</button>`:''}
-    </div>
-</td>
-
+                                    <div class="flex items-center space-x-2">
+                                        <label class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 cursor-pointer">
+                                            📷 เพิ่มรูป
+                                            <input type="file" multiple accept="image/*" onchange="Array.from(this.files).forEach(f=>uploadFile(f,tasks.find(t=>t.id==='${task.id}')))" class="sr-only">
+                                        </label>
+                                        ${task.images.length>0?`<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">👁️ ดูรูป (${task.images.length})</button>`:''}
+                                    </div>
+                                </td>
                                 <td class="py-3">
                                     <span class="px-2 py-1 rounded-full text-xs font-medium ${task.status === 'completed'?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">
                                         ${task.status === 'completed'?'✅ เสร็จเรียบร้อย':'⏳ ยังไม่เสร็จ'}
                                     </span>
-                                    ${task.completedAt?`<div class="text-xs text-gray-500 mt-1">${new Date(task.completedAt).toLocaleString('th-TH')}</div>`:''}
-                                    ${task.completedBy?`<div class="text-xs text-gray-500">โดย: ${task.completedBy}</div>` : ''}
                                 </td>
                                 <td class="py-3">
                                     <span class="px-2 py-1 rounded-full text-xs font-medium ${task.reviewStatus === 'reviewed'?'bg-purple-100 text-purple-800':'bg-red-100 text-red-800'}">
                                         ${task.reviewStatus === 'reviewed'?'✅ ตรวจสอบแล้ว':'⚠️ ยังไม่ได้ตรวจสอบ'}
                                     </span>
-                                    ${task.reviewedAt?`<div class="text-xs text-gray-500 mt-1">${new Date(task.reviewedAt).toLocaleString('th-TH')}</div>`:''}
-                                    ${task.reviewedBy?`<div class="text-xs text-gray-500">โดย: ${task.reviewedBy}</div>`:''}
                                     <input type="text" value="${task.reviewedBy}" onchange="updateReviewer('${task.id}', this.value)" placeholder="ชื่อผู้ตรวจสอบ"
                                         ${task.reviewStatus === 'reviewed' ? 'disabled' : ''}
                                         class="w-full px-2 py-1 border rounded text-xs mt-2 ${task.reviewStatus === 'reviewed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-purple-500'}">
@@ -320,279 +279,58 @@ function renderTasks() {
     updateProgress();
 }
 
-function renderSummary() {
-    const statsContainer = document.getElementById('summaryStats');
-    const tableContainer = document.getElementById('summaryTable');
-
-    if (!tasks || tasks.length === 0) {
-        statsContainer.innerHTML = '<p class="text-center text-gray-500">ยังไม่มีข้อมูลงาน</p>';
-        tableContainer.innerHTML = '';
-        return;
-    }
-
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(t => t.status === 'completed').length;
-    const pendingTasks = totalTasks - completedTasks;
-    const progressPercent = (completedTasks / totalTasks) * 100;
-    const reviewedTasks = tasks.filter(t => t.reviewStatus === 'reviewed').length;
-    const pendingReviewTasks = completedTasks - reviewedTasks;
-
-    statsContainer.innerHTML = `
-        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-lg">
-            <div class="text-2xl font-bold">${totalTasks}</div>
-            <div class="text-sm opacity-90">งานทั้งหมด</div>
-        </div>
-        <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-lg">
-            <div class="text-2xl font-bold">${completedTasks}</div>
-            <div class="text-sm opacity-90">เสร็จเรียบร้อย</div>
-        </div>
-        <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-4 rounded-lg">
-            <div class="text-2xl font-bold">${pendingTasks}</div>
-            <div class="text-sm opacity-90">ยังไม่เสร็จ</div>
-        </div>
-        <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-lg">
-            <div class="text-2xl font-bold">${reviewedTasks}</div>
-            <div class="text-sm opacity-90">ตรวจสอบแล้ว</div>
-        </div>
-        <div class="bg-gradient-to-r from-pink-500 to-pink-600 text-white p-4 rounded-lg">
-            <div class="text-2xl font-bold">${pendingReviewTasks}</div>
-            <div class="text-sm opacity-90">รอการตรวจสอบ</div>
-        </div>
-    `;
-
-    const groupedByRoom = {};
-    tasks.forEach(task => {
-        const key = `${task.floor}-${task.room}`;
-        if (!groupedByRoom[key]) groupedByRoom[key] = { completed: 0, total: 0, reviewed: 0, tasks: [] };
-        groupedByRoom[key].total++;
-        if (task.status === 'completed') groupedByRoom[key].completed++;
-        if (task.reviewStatus === 'reviewed') groupedByRoom[key].reviewed++;
-        groupedByRoom[key].tasks.push(task);
-    });
-
-    tableContainer.innerHTML = `
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="text-left p-3 font-semibold">ห้อง</th>
-                    <th class="text-left p-3 font-semibold">ชั้น</th>
-                    <th class="text-center p-3 font-semibold">งานเสร็จ/ทั้งหมด</th>
-                    <th class="text-center p-3 font-semibold">ความคืบหน้า</th>
-                    <th class="text-center p-3 font-semibold">สถานะตรวจสอบ</th>
-                    <th class="text-left p-3 font-semibold">งานที่เหลือ</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${Object.keys(groupedByRoom).map(roomKey => {
-                    const [floor, room] = roomKey.split('-');
-                    const roomData = groupedByRoom[roomKey];
-                    const percent = (roomData.completed / roomData.total) * 100;
-                    const pendingTasks = roomData.tasks.filter(t => t.status === 'pending');
-                    const reviewedCount = roomData.tasks.filter(t => t.reviewStatus === 'reviewed').length;
-
-                    return `
-                        <tr class="border-b hover:bg-gray-50">
-                            <td class="p-3 font-medium">${room}</td>
-                            <td class="p-3">${floor}</td>
-                            <td class="p-3 text-center">
-                                <span class="font-bold ${roomData.completed === roomData.total ? 'text-green-600' : 'text-yellow-600'}">
-                                    ${roomData.completed}/${roomData.total}
-                                </span>
-                            </td>
-                            <td class="p-3">
-                                <div class="flex items-center space-x-2">
-                                    <div class="flex-1 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full" style="width: ${percent}%"></div>
-                                    </div>
-                                    <span class="text-xs font-medium">${Math.round(percent)}%</span>
-                                </div>
-                            </td>
-                            <td class="p-3 text-center">
-                                <span class="font-bold ${reviewedCount === roomData.completed ? 'text-purple-600' : 'text-red-600'}">
-                                    ${reviewedCount}/${roomData.completed}
-                                </span>
-                            </td>
-                            <td class="p-3">
-                                ${pendingTasks.length > 0 ? 
-                                    pendingTasks.slice(0, 3).map(t => t.taskType).join(', ') + 
-                                    (pendingTasks.length > 3 ? ` และอีก ${pendingTasks.length - 3} งาน` : '')
-                                    : 'เสร็จหมดแล้ว ✅'
-                                }
-                            </td>
-                        </tr>
-                    `;
-                }).join('')}
-            </tbody>
-        </table>
-    `;
-}
-
-// Tab switch
-function showTab(tab) {
-    currentTab = tab;
-    document.getElementById('tasksTab').className = tab === 'tasks' 
-        ? 'px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors'
-        : 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors';
-    document.getElementById('summaryTab').className = tab === 'summary' 
-        ? 'px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors'
-        : 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors';
-    document.getElementById('tasksContent').classList.toggle('hidden', tab !== 'tasks');
-    document.getElementById('summaryContent').classList.toggle('hidden', tab !== 'summary');
-    if (tab === 'tasks') renderTasks();
-    else renderSummary();
-}
-
-// Progress bar update
-function updateProgress(){
-    const completed = tasks.filter(t => t.status === 'completed').length;
-    const total = tasks.length;
-    const percent = total ? Math.round((completed / total) * 100) : 0;
-    const bar = document.getElementById('progressBar');
-    const text = document.getElementById('progressText');
-    bar.style.width = percent + '%';
-    text.textContent = percent + '%';
-}
-
-// Toggle task status
+// --- Other functions (toggleTaskStatus, updateAssignee, toggleReviewStatus, updateReviewer, resetAllTasks, uploadFile, viewImages, closeImageModal) ---
 function toggleTaskStatus(taskId) {
     const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    if (!task.assignee || task.assignee.trim() === '') {
-        alert('กรุณากรอกชื่อผู้จัดทำก่อน');
-        return;
-    }
-    if (task.status === 'pending') {
-        task.status = 'completed';
-        task.completedAt = new Date().toISOString();
-        task.completedBy = task.assignee;
-    } else {
-        task.status = 'pending';
-        task.completedAt = null;
-        task.completedBy = '';
-        task.reviewStatus = 'pending_review';
-        task.reviewedBy = '';
-        task.reviewedAt = null;
-    }
-    saveTaskToFirebase(task)
-    renderTasks();
-    if (currentTab === 'summary') {
-        renderSummary();
-    }
+    if(!task) return;
+    if(!task.assignee.trim()){ alert('กรุณากรอกชื่อผู้จัดทำก่อน'); return; }
+    if(task.status==='pending'){ task.status='completed'; task.completedAt=new Date().toISOString(); task.completedBy=task.assignee; }
+    else{ task.status='pending'; task.completedAt=null; task.completedBy=''; task.reviewStatus='pending_review'; task.reviewedBy=''; task.reviewedAt=null; }
+    saveTaskToFirebase(task); renderTasks(); if(currentTab==='summary') renderSummary();
 }
+function updateAssignee(id,value){ const t=tasks.find(x=>x.id===id); if(!t) return; if(t.status==='completed'){ alert('ไม่สามารถแก้ไขชื่อผู้ทำงานได้'); renderTasks(); return; } t.assignee=value; saveTaskToFirebase(t); renderTasks(); }
+function toggleReviewStatus(taskId){ const t=tasks.find(x=>x.id===taskId); if(!t) return; if(t.status!=='completed'){ alert('ไม่สามารถตรวจสอบงานที่ยังไม่เสร็จได้'); return; } if(!t.reviewedBy.trim()){ alert('กรุณากรอกชื่อผู้ตรวจสอบก่อน'); return; } t.reviewStatus = t.reviewStatus==='pending_review'?'reviewed':'pending_review'; t.reviewedAt = t.reviewStatus==='reviewed'?new Date().toISOString():null; saveTaskToFirebase(t); renderTasks(); if(currentTab==='summary') renderSummary(); }
+function updateReviewer(id,value){ const t=tasks.find(x=>x.id===id); if(!t) return; if(t.reviewStatus==='reviewed'){ alert('ไม่สามารถแก้ไขชื่อผู้ตรวจสอบได้'); renderTasks(); return; } t.reviewedBy=value; saveTaskToFirebase(t); renderTasks(); }
+async function resetAllTasks(){ if(!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return; tasks.forEach(t=>{ t.status='pending'; t.completedAt=null; t.completedBy=''; t.assignee=''; t.images=[]; t.reviewStatus='pending_review'; t.reviewedBy=''; t.reviewedAt=null; }); await saveToFirebase(); renderTasks(); }
+function uploadFile(file,task){ if(!task.images) task.images=[]; const reader=new FileReader(); reader.onload=e=>{ task.images.push(e.target.result); saveTaskToFirebase(task); renderTasks(); }; reader.readAsDataURL(file); }
+function viewImages(id){ const t=tasks.find(x=>x.id===id); if(!t||!t.images||!t.images.length) return; const c=document.getElementById('imageModalContent'); c.innerHTML=t.images.map(img=>`<img src="${img}" class="w-full mb-2 image-preview rounded shadow">`).join(''); document.getElementById('imageModal').classList.remove('hidden'); }
+function closeImageModal(){ document.getElementById('imageModal').classList.add('hidden'); }
+function updateProgress(){ const total=tasks.length; const done=tasks.filter(t=>t.status==='completed').length; const percent = total? Math.round((done/total)*100):0; document.getElementById('progressBar').style.width=`${percent}%`; document.getElementById('progressText').textContent=`${percent}%`; }
+function showTab(tab){ currentTab=tab; document.getElementById('tasksContent').classList.toggle('hidden',tab!=='tasks'); document.getElementById('summaryContent').classList.toggle('hidden',tab!=='summary'); document.getElementById('tasksTab').classList.toggle('bg-blue-500',tab==='tasks'); document.getElementById('tasksTab').classList.toggle('bg-gray-200',tab!=='tasks'); document.getElementById('summaryTab').classList.toggle('bg-blue-500',tab==='summary'); document.getElementById('summaryTab').classList.toggle('bg-gray-200',tab!=='summary'); if(tab==='summary') renderSummary(); }
+function renderSummary(){ const statsDiv=document.getElementById('summaryStats'); const tableDiv=document.getElementById('summaryTable'); statsDiv.innerHTML=''; tableDiv.innerHTML=''; const floorGroups={}; tasks.forEach(t=>{ if(!floorGroups[t.floor]) floorGroups[t.floor]=[]; floorGroups[t.floor].push(t); }); Object.keys(floorGroups).forEach(f=>{ const fl=floorGroups[f]; const total=fl.length; const done=fl.filter(x=>x.status==='completed').length; const reviewed=fl.filter(x=>x.reviewStatus==='reviewed').length; const card=document.createElement('div'); card.className='bg-blue-100 rounded p-4 text-center'; card.innerHTML=`<div class="font-bold text-lg">${f} ชั้น</div><div>งานทั้งหมด: ${total}</div><div>เสร็จแล้ว: ${done}</div><div>ตรวจสอบแล้ว: ${reviewed}</div>`; statsDiv.appendChild(card); }); const rows=tasks.map(t=>`<tr class="border-b"><td class="px-2 py-1">${t.floor}-${t.room}</td><td class="px-2 py-1">${t.taskType}</td><td class="px-2 py-1">${t.assignee}</td><td class="px-2 py-1">${t.status}</td><td class="px-2 py-1">${t.reviewStatus}</td></tr>`).join(''); tableDiv.innerHTML=`<table class="w-full text-sm"><thead><tr class="border-b bg-gray-100"><th>ห้อง</th><th>งาน</th><th>ผู้ทำ</th><th>สถานะงาน</th><th>สถานะตรวจสอบ</th></tr></thead><tbody>${rows}</tbody></table>`; }
 
-// Update assignee
-function updateAssignee(id, value) {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    if (task.status === 'completed') {
-        alert('ไม่สามารถแก้ไขชื่อผู้ทำงานได้ เนื่องจากงานนี้เสร็จเรียบร้อยแล้ว');
-        renderTasks(); 
-        return;
-    }
-    task.assignee = value;
-    saveTaskToFirebase(task)
-    renderTasks();
-}
+document.addEventListener('DOMContentLoaded',()=>{ initializeTasks(); Object.keys(floors).forEach(f=>{ const sel=document.getElementById('floorFilter'); sel.addEventListener('change',()=>{ const val=sel.value; const roomSel=document.getElementById('roomFilter'); roomSel.innerHTML='<option value="">ทุกห้อง</option>'; if(val&&floors[val]) floors[val].forEach(r=>{roomSel.innerHTML+=`<option value="${r}">${r}</option>`}); renderTasks(); }); }); document.getElementById('roomFilter').addEventListener('change',renderTasks); document.getElementById('statusFilter').addEventListener('change',renderTasks); });
+document.addEventListener('DOMContentLoaded',()=>{
+    initializeTasks();
 
-// Toggle review status
-function toggleReviewStatus(taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    if (task.status !== 'completed') {
-        alert('ไม่สามารถตรวจสอบงานที่ยังไม่เสร็จได้');
-        return;
-    }
-    if (!task.reviewedBy || task.reviewedBy.trim() === '') {
-        alert('กรุณากรอกชื่อผู้ตรวจสอบก่อน');
-        return;
-    }
-    if (task.reviewStatus === 'pending_review') {
-        task.reviewStatus = 'reviewed';
-        task.reviewedAt = new Date().toISOString();
-    } else {
-        task.reviewStatus = 'pending_review';
-        task.reviewedAt = null;
-    }
-    saveTaskToFirebase(task)
-    renderTasks();
-    if (currentTab === 'summary') {
-        renderSummary();
-    }
-}
+    window.toggleTaskStatus = toggleTaskStatus;
+    window.updateAssignee = updateAssignee;
+    window.toggleReviewStatus = toggleReviewStatus;
+    window.updateReviewer = updateReviewer;
+    window.resetAllTasks = resetAllTasks;
+    window.uploadFile = uploadFile;
+    window.viewImages = viewImages;
+    window.closeImageModal = closeImageModal;
+    window.showTab = showTab;
 
-// Update reviewer
-function updateReviewer(id, value) {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    if (task.reviewStatus === 'reviewed') {
-        alert('ไม่สามารถแก้ไขชื่อผู้ตรวจสอบได้ เนื่องจากงานนี้ตรวจสอบแล้ว');
-        renderTasks(); 
-        return;
-    }
-    task.reviewedBy = value;
-    saveTaskToFirebase(task)
-    renderTasks();
-}
-
-// Reset all tasks
-async function resetAllTasks(){
-    if (!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return;
-    tasks.forEach(task => {
-        task.status = 'pending';
-        task.completedAt = null;
-        task.completedBy = '';
-        task.assignee = '';
-        task.images = [];
-        task.reviewStatus = 'pending_review';
-        task.reviewedBy = '';
-        task.reviewedAt = null;
+    Object.keys(floors).forEach(f=>{
+        const sel=document.getElementById('floorFilter');
+        sel.addEventListener('change',()=>{
+            const val=sel.value;
+            const roomSel=document.getElementById('roomFilter');
+            roomSel.innerHTML='<option value="">ทุกห้อง</option>';
+            if(val&&floors[val]) floors[val].forEach(r=>{
+                roomSel.innerHTML+=`<option value="${r}">${r}</option>`
+            });
+            renderTasks();
+        });
     });
-    await saveToFirebase();  // <-- ใช้ batch save ทั้งหมด
-    renderTasks();
-}
 
-
-// Image upload
-function uploadFile(file, task){
-    const reader = new FileReader();
-    reader.onload = function(e){
-        task.images.push(e.target.result);
-        saveTaskToFirebase(task)
-        renderTasks();
-    }
-    reader.readAsDataURL(file);
-}
-
-// View images
-function viewImages(id){
-    const task = tasks.find(t => t.id === id);
-    if (!task || task.images.length === 0) return;
-    const container = document.getElementById('imageModalContent');
-    container.innerHTML = task.images.map(img => `<img src="${img}" class="w-full mb-2 image-preview">`).join('');
-    document.getElementById('imageModal').classList.remove('hidden');
-}
-
-function closeImageModal(){
-    document.getElementById('imageModal').classList.add('hidden');
-}
-
-// Update room filter options
-document.getElementById('floorFilter').addEventListener('change', function(){
-    const floor = this.value;
-    const roomSelect = document.getElementById('roomFilter');
-    roomSelect.innerHTML = `<option value="">ทุกห้อง</option>`;
-    if(floor && floors[floor]){
-        floors[floor].forEach(r => roomSelect.innerHTML += `<option value="${r}">${r}</option>`);
-    }
-    renderTasks();
+    document.getElementById('roomFilter').addEventListener('change',renderTasks);
+    document.getElementById('statusFilter').addEventListener('change',renderTasks);
 });
 
-document.getElementById('roomFilter').addEventListener('change', renderTasks);
-document.getElementById('statusFilter').addEventListener('change', renderTasks);
-
-// Init
-initializeTasks();
-showTab('tasks');
 </script>
+
 </body>
 </html>
