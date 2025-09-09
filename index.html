@@ -10,8 +10,16 @@
 body { font-family: 'Sarabun', sans-serif; }
 .fade-in { animation: fadeIn 0.3s ease-in; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.image-preview { transition: all 0.3s ease; }
-.image-preview:hover { transform: scale(1.05); }
+#imageModal img {
+    max-height: 60vh;   /* สูงสุดไม่เกินหน้าจอ */
+    width: auto;
+    object-fit: contain;
+    transition: transform 0.3s;
+    cursor: pointer;
+}
+#imageModal img:hover {
+    transform: scale(1.05);
+}
 </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -89,19 +97,20 @@ body { font-family: 'Sarabun', sans-serif; }
     </div>
 </div>
 
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
 // Firebase config
 const firebaseConfig = {
-    apiKey: "AIzaSyBiiIBJWboGwNlxp0489Mf-ZUn4DOPQGtQ",
-    authDomain: "notihk-9cf44.firebaseapp.com",
-    projectId: "notihk-9cf44",
-    storageBucket: "notihk-9cf44.appspot.com",
-    messagingSenderId: "451924097131",
-    appId: "1:451924097131:web:c90ab0c8ad0ed86a13d92e"
-};
+    apiKey: "AIzaSyB0YpsZHYPOH40LFCEpgv_MrViaVkO22G8",
+    authDomain: "hkkreport-8e93b.firebaseapp.com",
+    projectId: "hkkreport-8e93b",
+    storageBucket: "hkkreport-8e93b.firebasestorage.app",
+    messagingSenderId: "50585901555",
+    appId: "1:50585901555:web:6046034a7a9a3cc1921a86"
+  };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const tasksCollection = collection(db, "housekeepingTasks");
@@ -288,12 +297,86 @@ function toggleTaskStatus(taskId) {
     else{ task.status='pending'; task.completedAt=null; task.completedBy=''; task.reviewStatus='pending_review'; task.reviewedBy=''; task.reviewedAt=null; }
     saveTaskToFirebase(task); renderTasks(); if(currentTab==='summary') renderSummary();
 }
+
+// ทำให้ uploadFile เป็น global
+window.uploadFile = async function(file, task) {
+    try {
+        const fileRef = ref(storage, `housekeeping/${task.id}/${Date.now()}_${file.name}`);
+        await uploadBytes(fileRef, file); // อัปโหลดไฟล์
+        const url = await getDownloadURL(fileRef); // ดึง URL
+        task.images.push(url);
+        await saveTaskToFirebase(task);
+        renderTasks();
+        showToast(`อัปโหลดรูป ${file.name} สำเร็จ`);
+    } catch(err) {
+        console.error(err);
+        showToast(`อัปโหลดรูป ${file.name} ไม่สำเร็จ`, true);
+    }
+};
+
+// กำหนด event listener ให้ input
+document.addEventListener('change', function(e){
+    if(e.target.matches('.file-input')){
+        const taskId = e.target.dataset.taskid;
+        const task = tasks.find(t => t.id === taskId);
+        if(task){
+            Array.from(e.target.files).forEach(file => uploadFile(file, task));
+        }
+    }
+});
+
+
 function updateAssignee(id,value){ const t=tasks.find(x=>x.id===id); if(!t) return; if(t.status==='completed'){ alert('ไม่สามารถแก้ไขชื่อผู้ทำงานได้'); renderTasks(); return; } t.assignee=value; saveTaskToFirebase(t); renderTasks(); }
 function toggleReviewStatus(taskId){ const t=tasks.find(x=>x.id===taskId); if(!t) return; if(t.status!=='completed'){ alert('ไม่สามารถตรวจสอบงานที่ยังไม่เสร็จได้'); return; } if(!t.reviewedBy.trim()){ alert('กรุณากรอกชื่อผู้ตรวจสอบก่อน'); return; } t.reviewStatus = t.reviewStatus==='pending_review'?'reviewed':'pending_review'; t.reviewedAt = t.reviewStatus==='reviewed'?new Date().toISOString():null; saveTaskToFirebase(t); renderTasks(); if(currentTab==='summary') renderSummary(); }
 function updateReviewer(id,value){ const t=tasks.find(x=>x.id===id); if(!t) return; if(t.reviewStatus==='reviewed'){ alert('ไม่สามารถแก้ไขชื่อผู้ตรวจสอบได้'); renderTasks(); return; } t.reviewedBy=value; saveTaskToFirebase(t); renderTasks(); }
 async function resetAllTasks(){ if(!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return; tasks.forEach(t=>{ t.status='pending'; t.completedAt=null; t.completedBy=''; t.assignee=''; t.images=[]; t.reviewStatus='pending_review'; t.reviewedBy=''; t.reviewedAt=null; }); await saveToFirebase(); renderTasks(); }
-function uploadFile(file,task){ if(!task.images) task.images=[]; const reader=new FileReader(); reader.onload=e=>{ task.images.push(e.target.result); saveTaskToFirebase(task); renderTasks(); }; reader.readAsDataURL(file); }
-function viewImages(id){ const t=tasks.find(x=>x.id===id); if(!t||!t.images||!t.images.length) return; const c=document.getElementById('imageModalContent'); c.innerHTML=t.images.map(img=>`<img src="${img}" class="w-full mb-2 image-preview rounded shadow">`).join(''); document.getElementById('imageModal').classList.remove('hidden'); }
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
+
+const storage = getStorage(app);
+
+async function uploadFile(file, task) {
+    try {
+        // อ้างอิงตำแหน่งไฟล์ใน Storage
+        const fileRef = ref(storage, `housekeeping/${task.id}/${Date.now()}_${file.name}`);
+        
+        // อัปโหลดไฟล์
+        await uploadBytes(fileRef, file);
+        
+        // ดึง URL สำหรับดาวน์โหลดไฟล์
+        const url = await getDownloadURL(fileRef);
+        
+        // เก็บ URL ไว้ใน task.images
+        if (!task.images) task.images = [];
+        task.images.push(url);
+        
+        // บันทึกกลับไป Firestore
+        await saveTaskToFirebase(task);
+        
+        renderTasks();
+        showToast(`✅ อัปโหลดรูป ${file.name} สำเร็จ`);
+    } catch (err) {
+        console.error("Upload error:", err);
+        showToast(`❌ อัปโหลดรูป ${file.name} ไม่สำเร็จ`, true);
+    }
+}
+
+function viewImages(taskId) {
+    const task = tasks.find(x => x.id === taskId);
+    if (!task || !task.images || !task.images.length) return;
+
+    const container = document.getElementById('imageModalContent');
+    container.innerHTML = task.images.map(imgUrl => `
+        <img src="${imgUrl}" 
+             class="w-full max-h-64 object-contain mb-2 image-preview rounded shadow cursor-pointer"
+             onclick="window.open('${imgUrl}', '_blank')">
+    `).join('');
+
+    document.getElementById('imageModal').classList.remove('hidden');
+}
+
+
+
+
 function closeImageModal(){ document.getElementById('imageModal').classList.add('hidden'); }
 function updateProgress(){ const total=tasks.length; const done=tasks.filter(t=>t.status==='completed').length; const percent = total? Math.round((done/total)*100):0; document.getElementById('progressBar').style.width=`${percent}%`; document.getElementById('progressText').textContent=`${percent}%`; }
 function showTab(tab){ currentTab=tab; document.getElementById('tasksContent').classList.toggle('hidden',tab!=='tasks'); document.getElementById('summaryContent').classList.toggle('hidden',tab!=='summary'); document.getElementById('tasksTab').classList.toggle('bg-blue-500',tab==='tasks'); document.getElementById('tasksTab').classList.toggle('bg-gray-200',tab!=='tasks'); document.getElementById('summaryTab').classList.toggle('bg-blue-500',tab==='summary'); document.getElementById('summaryTab').classList.toggle('bg-gray-200',tab!=='summary'); if(tab==='summary') renderSummary(); }
@@ -329,6 +412,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.getElementById('roomFilter').addEventListener('change',renderTasks);
     document.getElementById('statusFilter').addEventListener('change',renderTasks);
 });
+
 
 </script>
 
