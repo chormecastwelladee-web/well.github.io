@@ -247,14 +247,20 @@ function renderTasks() {
                                         class="w-full px-2 py-1 border rounded text-xs ${task.status === 'completed' ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-1 focus:ring-blue-500'}">
                                 </td>
                                 <td class="py-3">
-                                    <div class="flex items-center space-x-2">
-                                        <label class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 cursor-pointer">
-                                            📷 เพิ่มรูป
-                                            <input type="file" multiple accept="image/*" onchange="Array.from(this.files).forEach(f=>uploadFile(f,tasks.find(t=>t.id==='${task.id}')))" class="sr-only">
-                                        </label>
-                                        ${task.images.length>0?`<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">👁️ ดูรูป (${task.images.length})</button>`:''}
-                                    </div>
-                                </td>
+    <div class="flex items-center space-x-2">
+        <label class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 cursor-pointer">
+            📷 เพิ่มรูป
+            <input type="file" multiple accept="image/*" class="sr-only"
+            onchange="handleFileSelect('${task.id}', this.files)">
+        </label>
+        ${task.images.filter(img => img.uploadedUrl).length > 0 
+          ? `<button onclick="viewImages('${task.id}')" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">
+                👁️ ดูรูป (${task.images.filter(img => img.uploadedUrl).length})
+            </button>` 
+          : ''}
+    </div>
+</td>
+
                                 <td class="py-3">
                                     <span class="px-2 py-1 rounded-full text-xs font-medium ${task.status === 'completed'?'bg-green-100 text-green-800':'bg-red-100 text-red-800'}">
                                         ${task.status === 'completed'?'✅ เสร็จเรียบร้อย':'⏳ ยังไม่เสร็จ'}
@@ -288,6 +294,7 @@ function renderTasks() {
     updateProgress();
 }
 
+
 // --- Other functions (toggleTaskStatus, updateAssignee, toggleReviewStatus, updateReviewer, resetAllTasks, uploadFile, viewImages, closeImageModal) ---
 function toggleTaskStatus(taskId) {
     const task = tasks.find(t => t.id === taskId);
@@ -299,20 +306,7 @@ function toggleTaskStatus(taskId) {
 }
 
 // ทำให้ uploadFile เป็น global
-window.uploadFile = async function(file, task) {
-    try {
-        const fileRef = ref(storage, `housekeeping/${task.id}/${Date.now()}_${file.name}`);
-        await uploadBytes(fileRef, file); // อัปโหลดไฟล์
-        const url = await getDownloadURL(fileRef); // ดึง URL
-        task.images.push(url);
-        await saveTaskToFirebase(task);
-        renderTasks();
-        showToast(`อัปโหลดรูป ${file.name} สำเร็จ`);
-    } catch(err) {
-        console.error(err);
-        showToast(`อัปโหลดรูป ${file.name} ไม่สำเร็จ`, true);
-    }
-};
+
 
 // กำหนด event listener ให้ input
 document.addEventListener('change', function(e){
@@ -326,53 +320,79 @@ document.addEventListener('change', function(e){
 });
 
 
+
 function updateAssignee(id,value){ const t=tasks.find(x=>x.id===id); if(!t) return; if(t.status==='completed'){ alert('ไม่สามารถแก้ไขชื่อผู้ทำงานได้'); renderTasks(); return; } t.assignee=value; saveTaskToFirebase(t); renderTasks(); }
 function toggleReviewStatus(taskId){ const t=tasks.find(x=>x.id===taskId); if(!t) return; if(t.status!=='completed'){ alert('ไม่สามารถตรวจสอบงานที่ยังไม่เสร็จได้'); return; } if(!t.reviewedBy.trim()){ alert('กรุณากรอกชื่อผู้ตรวจสอบก่อน'); return; } t.reviewStatus = t.reviewStatus==='pending_review'?'reviewed':'pending_review'; t.reviewedAt = t.reviewStatus==='reviewed'?new Date().toISOString():null; saveTaskToFirebase(t); renderTasks(); if(currentTab==='summary') renderSummary(); }
 function updateReviewer(id,value){ const t=tasks.find(x=>x.id===id); if(!t) return; if(t.reviewStatus==='reviewed'){ alert('ไม่สามารถแก้ไขชื่อผู้ตรวจสอบได้'); renderTasks(); return; } t.reviewedBy=value; saveTaskToFirebase(t); renderTasks(); }
 async function resetAllTasks(){ if(!confirm('คุณต้องการรีเซ็ตงานทั้งหมดใช่หรือไม่?')) return; tasks.forEach(t=>{ t.status='pending'; t.completedAt=null; t.completedBy=''; t.assignee=''; t.images=[]; t.reviewStatus='pending_review'; t.reviewedBy=''; t.reviewedAt=null; }); await saveToFirebase(); renderTasks(); }
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 
-const storage = getStorage(app);
+
+function handleFileSelect(taskId, files) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (!task.images) task.images = [];
+
+    Array.from(files).forEach(file => {
+        // เก็บ file ไว้ upload
+        task.images.push({ uploadedUrl: null, file });
+        uploadFile(file, task); // อัปโหลดทันที
+    });
+}
+window.handleFileSelect = handleFileSelect;
+
 
 async function uploadFile(file, task) {
+    if (!file || !task) return;
+
+    const cloudName = "duqvqdrwd"; // เปลี่ยนเป็นของคุณ
+    const uploadPreset = "unsigned_preset"; // ตั้งใน Cloudinary แบบ Unsigned
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+
     try {
-        // อ้างอิงตำแหน่งไฟล์ใน Storage
-        const fileRef = ref(storage, `housekeeping/${task.id}/${Date.now()}_${file.name}`);
-        
-        // อัปโหลดไฟล์
-        await uploadBytes(fileRef, file);
-        
-        // ดึง URL สำหรับดาวน์โหลดไฟล์
-        const url = await getDownloadURL(fileRef);
-        
-        // เก็บ URL ไว้ใน task.images
-        if (!task.images) task.images = [];
-        task.images.push(url);
-        
-        // บันทึกกลับไป Firestore
-        await saveTaskToFirebase(task);
-        
-        renderTasks();
-        showToast(`✅ อัปโหลดรูป ${file.name} สำเร็จ`);
+        const response = await fetch(url, { method: "POST", body: formData });
+        const data = await response.json();
+
+        if (data.secure_url) {
+            // อัปเดตรูปภาพใน task: แทนที่ object เดิมด้วย uploadedUrl
+            task.images = task.images.map(img =>
+                img.file === file ? { uploadedUrl: data.secure_url } : img
+            );
+
+            // บันทึกลง Firebase
+            await setDoc(doc(db, "housekeepingTasks", task.id), task);
+
+            renderTasks();
+        } else {
+            console.error("Upload error:", data);
+            alert("อัปโหลดไม่สำเร็จ: " + (data.error?.message || "ไม่ทราบสาเหตุ"));
+        }
     } catch (err) {
-        console.error("Upload error:", err);
-        showToast(`❌ อัปโหลดรูป ${file.name} ไม่สำเร็จ`, true);
+        console.error("Fetch error:", err);
+        alert("เกิดข้อผิดพลาดในการอัปโหลด");
     }
 }
+window.uploadFile = uploadFile;
+
+
+
 
 function viewImages(taskId) {
     const task = tasks.find(x => x.id === taskId);
-    if (!task || !task.images || !task.images.length) return;
+    if (!task || !task.images.length) return;
 
     const container = document.getElementById('imageModalContent');
-    container.innerHTML = task.images.map(imgUrl => `
-        <img src="${imgUrl}" 
-             class="w-full max-h-64 object-contain mb-2 image-preview rounded shadow cursor-pointer"
-             onclick="window.open('${imgUrl}', '_blank')">
-    `).join('');
+    container.innerHTML = task.images
+        .filter(img => img.uploadedUrl)
+        .map(img => `<img src="${img.uploadedUrl}" class="w-full max-h-64 object-contain mb-2 image-preview rounded shadow cursor-pointer" 
+                     onclick="window.open('${img.uploadedUrl}', '_blank')">`).join('');
 
     document.getElementById('imageModal').classList.remove('hidden');
 }
+
 
 
 
@@ -382,7 +402,7 @@ function updateProgress(){ const total=tasks.length; const done=tasks.filter(t=>
 function showTab(tab){ currentTab=tab; document.getElementById('tasksContent').classList.toggle('hidden',tab!=='tasks'); document.getElementById('summaryContent').classList.toggle('hidden',tab!=='summary'); document.getElementById('tasksTab').classList.toggle('bg-blue-500',tab==='tasks'); document.getElementById('tasksTab').classList.toggle('bg-gray-200',tab!=='tasks'); document.getElementById('summaryTab').classList.toggle('bg-blue-500',tab==='summary'); document.getElementById('summaryTab').classList.toggle('bg-gray-200',tab!=='summary'); if(tab==='summary') renderSummary(); }
 function renderSummary(){ const statsDiv=document.getElementById('summaryStats'); const tableDiv=document.getElementById('summaryTable'); statsDiv.innerHTML=''; tableDiv.innerHTML=''; const floorGroups={}; tasks.forEach(t=>{ if(!floorGroups[t.floor]) floorGroups[t.floor]=[]; floorGroups[t.floor].push(t); }); Object.keys(floorGroups).forEach(f=>{ const fl=floorGroups[f]; const total=fl.length; const done=fl.filter(x=>x.status==='completed').length; const reviewed=fl.filter(x=>x.reviewStatus==='reviewed').length; const card=document.createElement('div'); card.className='bg-blue-100 rounded p-4 text-center'; card.innerHTML=`<div class="font-bold text-lg">${f} ชั้น</div><div>งานทั้งหมด: ${total}</div><div>เสร็จแล้ว: ${done}</div><div>ตรวจสอบแล้ว: ${reviewed}</div>`; statsDiv.appendChild(card); }); const rows=tasks.map(t=>`<tr class="border-b"><td class="px-2 py-1">${t.floor}-${t.room}</td><td class="px-2 py-1">${t.taskType}</td><td class="px-2 py-1">${t.assignee}</td><td class="px-2 py-1">${t.status}</td><td class="px-2 py-1">${t.reviewStatus}</td></tr>`).join(''); tableDiv.innerHTML=`<table class="w-full text-sm"><thead><tr class="border-b bg-gray-100"><th>ห้อง</th><th>งาน</th><th>ผู้ทำ</th><th>สถานะงาน</th><th>สถานะตรวจสอบ</th></tr></thead><tbody>${rows}</tbody></table>`; }
 
-document.addEventListener('DOMContentLoaded',()=>{ initializeTasks(); Object.keys(floors).forEach(f=>{ const sel=document.getElementById('floorFilter'); sel.addEventListener('change',()=>{ const val=sel.value; const roomSel=document.getElementById('roomFilter'); roomSel.innerHTML='<option value="">ทุกห้อง</option>'; if(val&&floors[val]) floors[val].forEach(r=>{roomSel.innerHTML+=`<option value="${r}">${r}</option>`}); renderTasks(); }); }); document.getElementById('roomFilter').addEventListener('change',renderTasks); document.getElementById('statusFilter').addEventListener('change',renderTasks); });
+
 document.addEventListener('DOMContentLoaded',()=>{
     initializeTasks();
 
