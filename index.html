@@ -31,6 +31,8 @@ body { font-family: 'Sarabun', sans-serif; }
             <button onclick="showTab('tasks')" id="tasksTab" class="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors">
                 📋 งานทั้งหมด
             </button>
+            <button onclick="window.logout()">🚪 ออกจากระบบ</button>
+
             <button onclick="showTab('summary')" id="summaryTab" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors">
                 📊 สรุปงาน
             </button>
@@ -372,7 +374,7 @@ async function uploadFile(file, task) {
         }
     } catch (err) {
         console.error("Fetch error:", err);
-       
+        alert("เกิดข้อผิดพลาดในการอัปโหลด");
     }
 }
 window.uploadFile = uploadFile;
@@ -403,7 +405,19 @@ function showTab(tab){ currentTab=tab; document.getElementById('tasksContent').c
 function renderSummary(){ const statsDiv=document.getElementById('summaryStats'); const tableDiv=document.getElementById('summaryTable'); statsDiv.innerHTML=''; tableDiv.innerHTML=''; const floorGroups={}; tasks.forEach(t=>{ if(!floorGroups[t.floor]) floorGroups[t.floor]=[]; floorGroups[t.floor].push(t); }); Object.keys(floorGroups).forEach(f=>{ const fl=floorGroups[f]; const total=fl.length; const done=fl.filter(x=>x.status==='completed').length; const reviewed=fl.filter(x=>x.reviewStatus==='reviewed').length; const card=document.createElement('div'); card.className='bg-blue-100 rounded p-4 text-center'; card.innerHTML=`<div class="font-bold text-lg">${f} ชั้น</div><div>งานทั้งหมด: ${total}</div><div>เสร็จแล้ว: ${done}</div><div>ตรวจสอบแล้ว: ${reviewed}</div>`; statsDiv.appendChild(card); }); const rows=tasks.map(t=>`<tr class="border-b"><td class="px-2 py-1">${t.floor}-${t.room}</td><td class="px-2 py-1">${t.taskType}</td><td class="px-2 py-1">${t.assignee}</td><td class="px-2 py-1">${t.status}</td><td class="px-2 py-1">${t.reviewStatus}</td></tr>`).join(''); tableDiv.innerHTML=`<table class="w-full text-sm"><thead><tr class="border-b bg-gray-100"><th>ห้อง</th><th>งาน</th><th>ผู้ทำ</th><th>สถานะงาน</th><th>สถานะตรวจสอบ</th></tr></thead><tbody>${rows}</tbody></table>`; }
 
 
+function logout() {
+    localStorage.removeItem("loggedInUser");
+    window.location.href = "login.html";
+}
+
+
 document.addEventListener('DOMContentLoaded',()=>{
+   const user = localStorage.getItem("loggedInUser");
+    if (!user) {
+        // ถ้ายังไม่ได้ login ให้กลับไปหน้า login
+        window.location.href = "login.html";
+        return;
+    }
     initializeTasks();
 
     window.toggleTaskStatus = toggleTaskStatus;
@@ -415,6 +429,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     window.viewImages = viewImages;
     window.closeImageModal = closeImageModal;
     window.showTab = showTab;
+    window.logout = logout;
+
+
 
     Object.keys(floors).forEach(f=>{
         const sel=document.getElementById('floorFilter');
